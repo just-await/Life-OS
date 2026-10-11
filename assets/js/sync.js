@@ -1,4 +1,4 @@
-// Модуль синхронизации (Яндекс Диск с честной системой статусов)
+// Модуль синхронизации (Яндекс Диск — чистый CORS без блокировок)
 window.LifeSync = {
   yandexToken: null,
   isSyncing: false,
@@ -197,42 +197,43 @@ window.LifeSync = {
 
     try {
       let remoteData = null;
+
+      // 1. Запрос метаданных на скачивание (без конфликтующего cache: no-store)
       const downMetaRes = await fetch(`https://cloud-api.yandex.net/v1/disk/resources/download?path=${encodeURIComponent(filePath)}&_ts=${cacheBuster}`, {
-        headers: { Authorization: `OAuth ${this.yandexToken}` },
-        cache: 'no-store'
+        headers: { Authorization: `OAuth ${this.yandexToken}` }
       });
 
-      // 401/403: Токен фальшивый или отозван
       if (downMetaRes.status === 401 || downMetaRes.status === 403) {
         this.setStatus('AUTH_ERROR');
         throw new Error('Токен Яндекса недействителен или отозван');
       }
 
       if (downMetaRes.status === 404) {
+        // Файла ещё нет в облаке
         remoteData = null;
       } else if (!downMetaRes.ok) {
         throw new Error(`Ошибка сервиса Яндекса (HTTP ${downMetaRes.status})`);
       } else {
         const downMeta = await downMetaRes.json();
-        const fileRes = await fetch(downMeta.href + (downMeta.href.includes('?') ? '&' : '?') + `_ts=${cacheBuster}`, {
-          cache: 'no-store'
-        });
-
+        
+        // 2. Скачивание самого файла по чистой ссылке без порчи хэш-подписи
+        const fileRes = await fetch(downMeta.href);
         if (!fileRes.ok) {
-          throw new Error(`Ошибка загрузки данных (HTTP ${fileRes.status})`);
+          throw new Error(`Ошибка чтения файла из Диска (HTTP ${fileRes.status})`);
         }
         remoteData = await fileRes.json();
       }
 
+      // 3. Объединение локальных данных с облачными
       const localData = window.LifeState.data || window.LifeStorage.load();
       const mergedData = this.mergeData(localData, remoteData);
 
       window.LifeStorage.save(mergedData);
       window.LifeState.data = mergedData;
 
+      // 4. Запрос ссылки на сохранение
       const upMetaRes = await fetch(`https://cloud-api.yandex.net/v1/disk/resources/upload?path=${encodeURIComponent(filePath)}&overwrite=true&_ts=${cacheBuster}`, {
-        headers: { Authorization: `OAuth ${this.yandexToken}` },
-        cache: 'no-store'
+        headers: { Authorization: `OAuth ${this.yandexToken}` }
       });
 
       if (upMetaRes.status === 401 || upMetaRes.status === 403) {
@@ -245,6 +246,8 @@ window.LifeSync = {
       }
 
       const upMeta = await upMetaRes.json();
+
+      // 5. Отправка данных на Диск
       const uploadRes = await fetch(upMeta.href, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

@@ -1,4 +1,4 @@
-// Модуль синхронизации (Яндекс Диск со 100% обходом CORS-ограничения скачивания)
+// Модуль синхронизации (Яндекс Диск: чистый Local-First с собственным шлюзом)
 window.LifeSync = {
   yandexToken: null,
   isSyncing: false,
@@ -6,6 +6,9 @@ window.LifeSync = {
   status: 'NOT_CONNECTED',
 
   DEFAULT_CLIENT_ID: 'b8ac870907144a7ebdbcda02f5422fd7',
+
+  // ВСТАВЬТЕ СЮДА ВАШУ СКОПИРОВАННУЮ ССЫЛКУ ИЗ CLOUDFLARE:
+  WORKER_PROXY_URL: 'https://lifeos-proxy.jeanmanasaryan.workers.dev',
 
   init() {
     this.yandexToken = localStorage.getItem('LIFE_OS_YANDEX_TOKEN') || null;
@@ -56,43 +59,30 @@ window.LifeSync = {
     window.location.href = authUrl;
   },
 
-  // УМНОЕ СКАЧИВАНИЕ: Обходит блокировку CORS сервера downloader.disk.yandex.ru
-  async downloadFileWithFallback(downloadHref) {
-    // Попытка 1: Прямое скачивание
+  // ЧИСТОЕ СКАЧИВАНИЕ ЧЕРЕЗ ВАШ ПЕРСОНАЛЬНЫЙ ШЛЮЗ
+  async downloadFile(downloadHref) {
+    // 1. Сначала пробуем скачать напрямую
     try {
-      const res = await fetch(downloadHref);
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch (_) {
-      // Игнорируем блокировку браузера и переходим к запасному шлюзу
+      const directRes = await fetch(downloadHref);
+      if (directRes.ok) return await directRes.json();
+    } catch (_) {}
+
+    // 2. Если браузер заблокировал прямой CORS — скачиваем через ваш личный Worker
+    if (this.WORKER_PROXY_URL && !this.WORKER_PROXY_URL.includes('ваше-имя')) {
+      const proxyUrl = `${this.WORKER_PROXY_URL}?url=${encodeURIComponent(downloadHref)}`;
+      const proxyRes = await fetch(proxyUrl);
+      if (proxyRes.ok) return await proxyRes.json();
+      throw new Error(`Ошибка ответа личного шлюза (HTTP ${proxyRes.status})`);
     }
 
-    // Попытка 2: Шлюз AllOrigins
-    try {
-      const proxyUrl1 = `https://api.allorigins.win/raw?url=${encodeURIComponent(downloadHref)}`;
-      const res1 = await fetch(proxyUrl1);
-      if (res1.ok) {
-        return await res1.json();
-      }
-    } catch (_) {}
-
-    // Попытка 3: Шлюз CorsProxy
-    try {
-      const proxyUrl2 = `https://corsproxy.io/?url=${encodeURIComponent(downloadHref)}`;
-      const res2 = await fetch(proxyUrl2);
-      if (res2.ok) {
-        return await res2.json();
-      }
-    } catch (_) {}
-
-    throw new Error('CORS блокировка сервера скачивания Яндекса');
+    throw new Error('Укажите адрес вашего личного Worker в sync.js');
   },
 
   async runDiagnostic() {
     const report = [];
-    report.push(`📌 Версия: v1.3-gh`);
+    report.push(`📌 Версия: v1.4-clean`);
     report.push(`📌 Домен: ${window.location.origin}`);
+    report.push(`📌 Личный шлюз: ${this.WORKER_PROXY_URL.includes('ваше-имя') ? '⚠️ Не настроен' : '✓ Настроен'}`);
     report.push(`📌 Токен: ${this.yandexToken ? `Есть (${this.yandexToken.slice(0, 8)}...)` : '❌ Нет'}`);
 
     if (!this.yandexToken) {
@@ -133,11 +123,11 @@ window.LifeSync = {
       report.push(`❌ Сбой: ${e.message}`);
     }
 
-    // Тест 3 (с обходом CORS)
+    // Тест 3
     if (downloadHref) {
-      report.push(`\n[Тест 3] Скачивание данных...`);
+      report.push(`\n[Тест 3] Скачивание данных через личный шлюз...`);
       try {
-        const json = await this.downloadFileWithFallback(downloadHref);
+        const json = await this.downloadFile(downloadHref);
         report.push(`✓ Данные прочитаны успешно! Задач в облаке: ${(json.tasks || []).length}`);
       } catch (e) {
         report.push(`❌ Ошибка чтения: ${e.message}`);
@@ -305,18 +295,18 @@ window.LifeSync = {
         throw new Error(`Ошибка сервиса Яндекса (HTTP ${downMetaRes.status})`);
       } else {
         const downMeta = await downMetaRes.json();
-        // Скачиваем файл через каскадный шлюз с обходом CORS
-        remoteData = await this.downloadFileWithFallback(downMeta.href);
+        // 2. Скачивание файла через личный шлюз
+        remoteData = await this.downloadFile(downMeta.href);
       }
 
-      // 2. Объединяем данные
+      // 3. Слияние данных
       const localData = window.LifeState.data || window.LifeStorage.load();
       const mergedData = this.mergeData(localData, remoteData);
 
       window.LifeStorage.save(mergedData);
       window.LifeState.data = mergedData;
 
-      // 3. Получаем ссылку на загрузку
+      // 4. Ссылка на загрузку
       const upMetaRes = await fetch(`https://cloud-api.yandex.net/v1/disk/resources/upload?path=${encodeURIComponent(filePath)}&overwrite=true&_ts=${cacheBuster}`, {
         headers: { Authorization: `OAuth ${this.yandexToken}` }
       });
@@ -332,7 +322,7 @@ window.LifeSync = {
 
       const upMeta = await upMetaRes.json();
 
-      // 4. Отправляем обновленный файл на Диск
+      // 5. Запись на Диск
       const uploadRes = await fetch(upMeta.href, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

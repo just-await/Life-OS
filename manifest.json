@@ -1,0 +1,25 @@
+{
+  "name": "Life OS — личный планер",
+  "short_name": "Life OS",
+  "description": "Персональный цифровой органайзер в стиле необрутализма. Полная разгрузка оперативной памяти человека.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F6F3EB",
+  "theme_color": "#F6F3EB",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "./assets/icons/icon.png",
+      "type": "image/png",
+      "sizes": "192x192 512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/icons/icon.png",
+      "type": "image/png",
+      "sizes": "192x192 512x512",
+      "purpose": "maskable"
+    }
+  ]
+}

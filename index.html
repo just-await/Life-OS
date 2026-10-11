@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Life OS — Тактильный личный планер</title>
+  
+  <!-- Мета-теги PWA и Apple iOS -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#F6F3EB">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Life OS">
+  <link rel="icon" type="image/png" href="assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="assets/icons/icon.png">
+
+  <!-- Шрифты: Unbounded + Golos Text -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Модульные CSS стили -->
+  <link rel="stylesheet" href="assets/css/variables.css">
+  <link rel="stylesheet" href="assets/css/neobrutalism.css">
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/modal.css">
+</head>
+<body>
+
+  <!-- Контейнер тост-уведомлений -->
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <div class="container">
+    
+    <!-- 1. ШАПКА ПРИЛОЖЕНИЯ -->
+    <header class="header">
+      <div class="header-top-row">
+        <div class="logo-group">
+          <div class="logo-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="#141414" stroke="#141414" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+          </div>
+          <h1 class="logo-title">LIFE OS</h1>
+        </div>
+        <!-- Переключатель темы на мобилке -->
+        <button class="neo-btn theme-switch-btn theme-switch-btn-mobile" id="themeToggleBtnMobile" title="Сменить тему" aria-label="Сменить тему">🥛</button>
+      </div>
+
+      <div class="header-actions">
+        <!-- Переключатель темы на ПК -->
+        <button class="neo-btn theme-switch-btn theme-switch-btn-desktop" id="themeToggleBtnDesktop" title="Сменить тему" aria-label="Сменить тему">🥛</button>
+        <button class="neo-btn" id="installPwaBtn" style="display: none;" title="Установить как приложение">
+          📲 Установить
+        </button>
+        <button class="neo-btn" id="inboxBtn" aria-label="Открыть инбокс">
+          📥 Инбокс <span class="badge" id="inboxBadge" style="display: none;">0</span>
+        </button>
+        <button class="neo-btn neo-btn-primary" id="backupBtn" title="Резервная копия и синхронизация">
+          💾 Бэкап <span class="sync-dot sync-dot-none" id="headerSyncDot"></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ЭКРАН 1: ДЭШБОРД (ФОКУС ДНЯ + КАРТОТЕКА СФЕР) -->
+    <main id="viewDashboard" class="view-screen active">
+      
+      <!-- Фокус дня -->
+      <section class="neo-card focus-section">
+        <div class="section-title focus-title-bar">
+          <div class="focus-title-left">
+            <span>⭐ Фокус дня</span>
+            <span id="focusRatioLabel" class="focus-ratio-badge">0/0</span>
+          </div>
+          <button class="neo-btn neo-btn-sm clear-focus-btn" id="clearCompletedFocusBtn" style="display: none;" title="Убрать выполненные из фокуса">
+            🧹 Очистить
+          </button>
+        </div>
+        
+        <div class="progress-bar-wrap" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-bar-fill" id="focusProgressFill" style="width: 0%;"></div>
+        </div>
+
+        <div class="focus-list" id="focusList"></div>
+      </section>
+
+      <!-- Картотека сфер -->
+      <section>
+        <div class="section-title">
+          <span>🗂️ Сферы жизни</span>
+          <button class="neo-btn neo-btn-sm" id="addSphereBtn">+ Добавить сферу</button>
+        </div>
+
+        <div class="spheres-grid" id="spheresGrid"></div>
+      </section>
+
+    </main>
+
+    <!-- ЭКРАН 2: ЭКРАН СФЕРЫ (СЕТКА ПРОЕКТОВ-БЛОКНОТОВ) -->
+    <main id="viewSphere" class="view-screen">
+      
+      <div class="sphere-nav-bar">
+        <button class="neo-btn neo-btn-sm" id="backToDashboardBtn">
+          ← Картотека
+        </button>
+        <div class="nav-actions-group">
+          <button class="neo-btn neo-btn-sm" id="editSphereBtn" title="Редактировать сферу">
+            ✏️ Изменить
+          </button>
+          <button class="neo-btn neo-btn-sm" id="deleteSphereBtn" style="color: #CF1322;" title="Удалить сферу">
+            🗑️ Удалить
+          </button>
+        </div>
+      </div>
+
+      <!-- Баннер сферы -->
+      <div class="sphere-banner neo-card" id="sphereBanner">
+        <div class="sphere-banner-badge" id="sphereBannerIcon" aria-hidden="true"></div>
+        <div class="sphere-banner-info">
+          <h2 class="sphere-banner-title" id="sphereBannerTitle">Сфера</h2>
+          <span class="sphere-banner-meta" id="sphereBannerMeta">0 проектов</span>
+        </div>
+      </div>
+
+      <!-- Секция проектов -->
+      <section style="display: flex; flex-direction: column; gap: 20px;">
+        <div class="section-title" style="margin-bottom: 0;">
+          <span style="display: inline-flex; align-items: center; gap: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>
+            </svg>
+            Проекты сферы
+          </span>
+          <button class="neo-btn neo-btn-sm" id="addProjectBtn">+ Новый проект</button>
+        </div>
+
+        <div class="projects-grid" id="projectsGrid"></div>
+        <div id="projectsArchiveWrapper"></div>
+      </section>
+
+    </main>
+
+    <!-- ЭКРАН 3: ЭКРАН ПРОЕКТА (ЗАДАЧИ И ДЕЙСТВИЯ) -->
+    <main id="viewProject" class="view-screen">
+      
+      <div class="sphere-nav-bar">
+        <button class="neo-btn neo-btn-sm" id="backToSphereBtn">
+          ← В сферу
+        </button>
+        <div class="nav-actions-group">
+          <button class="neo-btn neo-btn-sm" id="editProjectBtn" title="Редактировать проект">
+            ✏️ Изменить
+          </button>
+          <button class="neo-btn neo-btn-sm" id="deleteProjectBtn" style="color: #CF1322;" title="Удалить проект">
+            🗑️ Удалить
+          </button>
+        </div>
+      </div>
+
+      <!-- Баннер проекта -->
+      <div class="sphere-banner neo-card" id="projectBanner">
+        <div class="sphere-banner-badge" id="projectBannerIcon" aria-hidden="true"></div>
+        <div class="sphere-banner-info" style="width: 100%;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="sphere-banner-title" id="projectBannerTitle">Проект</h2>
+            <span class="badge" id="projectBannerProgressBadge">0%</span>
+          </div>
+          <span class="sphere-banner-meta" id="projectBannerMeta">0 задач</span>
+        </div>
+      </div>
+
+      <!-- Задачи проекта -->
+      <section class="neo-card" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="section-title" style="margin-bottom: 0;">
+          <span style="display: inline-flex; align-items: center; gap: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m9 11 3 3L22 4"/>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+            </svg>
+            Список задач
+          </span>
+        </div>
+
+        <div class="project-tasks-list" id="projectTasksList"></div>
+
+        <form id="projectQuickTaskForm" class="quick-task-form">
+          <input type="text" id="projectQuickTaskInput" class="quick-task-input" placeholder="+ Новая задача... (Enter для сохранения)" required autocomplete="off">
+        </form>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: Центр данных и Синхронизации с Яндекс Диском -->
+  <div class="modal-overlay" id="backupModal" role="dialog" aria-modal="true" aria-labelledby="backupModalHeading">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="backupModalHeading">💾 Центр данных и Облако</h2>
+          <p style="font-size: 0.8rem; color: var(--ink-muted); margin-top: 2px;">Local-First: независимость и приватность.</p>
+        </div>
+        <button class="modal-close-btn" id="closeBackupModalBtn" aria-label="Закрыть">✕</button>
+      </div>
+
+      <!-- Статус памяти -->
+      <div class="backup-stats-pill">
+        <span>Память базы: <strong id="backupMemoryKb">0.0 КБ</strong></span>
+        <span id="cloudStatusBadge" style="color: var(--accent-done);">● 100% Локально</span>
+      </div>
+
+      <!-- Блок 1: Синхронизация с Яндекс Диском -->
+      <div class="backup-section-box">
+        <div class="backup-box-title">
+          <span>🟡 Яндекс Диск</span>
+          <span id="yandexSyncLabel" class="sync-time-badge">Не подключен</span>
+        </div>
+        <p class="backup-box-desc">Бесплатная и приватная синхронизация без серверов. Файл <code>planner_data.json</code> сохраняется в изолированную папку «Приложения/Life OS» на вашем личном Диске.</p>
+        
+        <!-- Состояние: НЕ подключено -->
+        <div id="yandexNotConnectedBlock" style="display: flex; flex-direction: column; gap: 8px;">
+          <button type="button" class="neo-btn neo-btn-primary" id="loginYandexBtn" style="width: 100%;">
+            ⚡ Войти через Яндекс ID (в 1 клик)
+          </button>
+          <button type="button" class="neo-btn neo-btn-sm" id="manualYandexTokenBtn" style="width: 100%;">
+            🔑 Указать токен вручную
+          </button>
+        </div>
+
+        <!-- Состояние: ПОДКЛЮЧЕНО -->
+        <div id="yandexConnectedBlock" style="display: none; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="neo-btn neo-btn-primary neo-btn-sm" id="syncYandexNowBtn" style="flex: 1;">
+            Синхронизировать сейчас 🔄
+          </button>
+          <button type="button" class="neo-btn neo-btn-sm" id="unlinkYandexBtn" style="color: #CF1322;" title="Отвязать токен">
+            Отключить
+          </button>
+        </div>
+      </div>
+
+      <!-- Блок 2: Ручной бэкап (Экспорт) -->
+      <div class="backup-section-box">
+        <h3 class="backup-box-title">📥 Скачать бэкап (.json)</h3>
+        <p class="backup-box-desc">Мгновенный экспорт всех сфер, проектов и мыслей в один независимый файл.</p>
+        <button type="button" class="neo-btn neo-btn-primary" id="downloadBackupBtn" style="width: 100%;">
+          Скачать файл резервной копии
+        </button>
+      </div>
+
+      <!-- Блок 3: Восстановление из файла -->
+      <div class="backup-section-box">
+        <h3 class="backup-box-title">📤 Восстановить из файла</h3>
+        <p class="backup-box-desc">Выберите файл для восстановления. Умное слияние объединит задачи с разных устройств без потерь.</p>
+        
+        <div class="merge-mode-selector">
+          <button type="button" class="merge-mode-btn active" id="modeMergeBtn" title="Объединит новые задачи без потерь">
+            ⚡ Умное слияние (Smart Merge)
+          </button>
+          <button type="button" class="merge-mode-btn" id="modeOverwriteBtn" title="Полностью заменит текущие задачи">
+            Перезаписать всё
+          </button>
+        </div>
+
+        <input type="file" id="backupFileInput" accept=".json" style="display: none;">
+        <div class="file-drop-zone" id="fileDropZone">
+          <span style="font-weight: 700; font-size: 0.88rem;">Нажмите, чтобы выбрать файл .json</span>
+        </div>
+      </div>
+
+      <!-- Блок 4: Очистка и сброс до нуля -->
+      <div style="margin-top: 6px;">
+        <button type="button" class="neo-btn" id="resetAllDataBtn" style="width: 100%; color: #CF1322; border-color: #CF1322;">
+          🗑️ Очистить все данные (Сбросить до нуля)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: Инбокс -->
+  <div class="modal-overlay" id="inboxModal" role="dialog" aria-modal="true" aria-labelledby="inboxModalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="inboxModalTitle">📥 Инбокс</h2>
+          <p style="font-size: 0.8rem; color: var(--ink-muted); margin-top: 2px;">Запиши мысль за 3 секунды, чтобы освободить голову.</p>
+        </div>
+        <button class="modal-close-btn" id="closeInboxBtn" aria-label="Закрыть">✕</button>
+      </div>
+
+      <form id="inboxForm" style="display: flex; gap: 8px;">
+        <input type="text" id="inboxInput" class="neo-input" placeholder="О чем думаешь? (Enter для записи)" maxlength="80" autocomplete="off" required>
+        <button type="submit" class="neo-btn neo-btn-primary neo-btn-sm" style="flex-shrink: 0;" aria-label="Добавить мысль">+</button>
+      </form>
+
+      <div class="inbox-list" id="inboxList"></div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: Перенос мысли из Инбокса в проект -->
+  <div class="modal-overlay" id="inboxTriageModal" role="dialog" aria-modal="true" aria-labelledby="triageModalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="triageModalTitle">Перенести в проект</h2>
+        <button class="modal-close-btn" id="closeInboxTriageBtn" aria-label="Закрыть">✕</button>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--ink-muted);">Выберите цель/проект, в который превратится эта мысль:</p>
+      
+      <div id="triageProjectsList" class="triage-list-wrap"></div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: Создание / Редактирование Сферы -->
+  <div class="modal-overlay" id="addSphereModal" role="dialog" aria-modal="true" aria-labelledby="sphereModalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="sphereModalTitle">Новая сфера жизни</h2>
+        <button class="modal-close-btn" id="closeModalBtn" aria-label="Закрыть">✕</button>
+      </div>
+
+      <form id="addSphereForm">
+        <div class="form-group">
+          <label class="form-label" for="sphereTitleInput">Название сферы</label>
+          <input type="text" id="sphereTitleInput" class="neo-input" placeholder="Например: Финансы или Спорт" maxlength="32" required autocomplete="off">
+        </div>
+
+        <div class="form-group" style="margin-top: 14px;">
+          <label class="form-label">Иконка</label>
+          <div class="icon-picker-grid" id="sphereIconPickerGrid"></div>
+        </div>
+
+        <div class="form-group" style="margin-top: 14px;">
+          <label class="form-label">Цвет папки</label>
+          <div class="color-picker-grid" id="sphereColorPickerGrid"></div>
+        </div>
+
+        <div class="form-group" style="margin-top: 14px;">
+          <label class="form-label">Превью</label>
+          <div class="preview-box">
+            <div class="preview-badge" id="spherePreviewBadge"></div>
+            <span class="preview-title" id="spherePreviewTitle">Название сферы</span>
+          </div>
+        </div>
+
+        <button type="submit" class="neo-btn neo-btn-primary" id="sphereSubmitBtn" style="width: 100%; margin-top: 20px;">
+          + Создать сферу
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: Создание / Редактирование Проекта -->
+  <div class="modal-overlay" id="addProjectModal" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="projectModalTitle">Новый проект</h2>
+        <button class="modal-close-btn" id="closeProjectModalBtn" aria-label="Закрыть">✕</button>
+      </div>
+
+      <form id="addProjectForm">
+        <div class="form-group">
+          <label class="form-label" for="projectTitleInput">Название проекта</label>
+          <input type="text" id="projectTitleInput" class="neo-input" placeholder="Например: Ремонт авто или Английский" maxlength="36" required autocomplete="off">
+        </div>
+
+        <div class="form-group" style="margin-top: 14px;">
+          <label class="form-label">Иконка проекта</label>
+          <div class="icon-picker-grid" id="projectIconPickerGrid"></div>
+        </div>
+
+        <div class="form-group" style="margin-top: 14px;">
+          <label class="form-label">Цвет блокнота</label>
+          <div class="color-picker-grid" id="projectColorPickerGrid"></div>
+        </div>
+
+        <div class="form-group" style="margin-top: 14px;">
+          <label class="form-label">Превью карточки</label>
+          <div class="preview-box">
+            <div class="preview-badge" id="projectPreviewBadge"></div>
+            <span class="preview-title" id="projectPreviewTitle">Название проекта</span>
+          </div>
+        </div>
+
+        <button type="submit" class="neo-btn neo-btn-primary" id="projectSubmitBtn" style="width: 100%; margin-top: 20px;">
+          + Создать блокнот проекта
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: Карточка задачи -->
+  <div class="modal-overlay" id="taskDetailModal" role="dialog" aria-modal="true" aria-labelledby="taskDetailModalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="taskDetailModalTitle">Карточка задачи</h2>
+        <button class="modal-close-btn" id="closeTaskDetailBtn" aria-label="Закрыть">✕</button>
+      </div>
+
+      <form id="taskDetailForm" style="display: flex; flex-direction: column; gap: 16px;">
+        <input type="hidden" id="detailTaskId">
+
+        <div class="form-group">
+          <label class="form-label" for="detailTaskTitle">Задача</label>
+          <input type="text" id="detailTaskTitle" class="neo-input" required maxlength="120" autocomplete="off">
+        </div>
+
+        <div class="property-constructor-bar">
+          <span class="form-label" style="margin: 0;">Добавить свойство:</span>
+          <div class="prop-btns-group">
+            <button type="button" class="neo-btn neo-btn-sm" id="propBtnDeadline">+ 📅 Дедлайн</button>
+            <button type="button" class="neo-btn neo-btn-sm" id="propBtnChecklist">+ ☑️ Чеклист</button>
+            <button type="button" class="neo-btn neo-btn-sm" id="propBtnNote">+ 📝 Заметка</button>
+          </div>
+        </div>
+
+        <div class="dynamic-prop-box" id="propBoxDeadline" style="display: none;">
+          <div class="prop-box-header">
+            <span class="prop-box-title">📅 Дедлайн</span>
+            <button type="button" class="prop-remove-btn" id="removeDeadlineBtn">Удалить ✕</button>
+          </div>
+          <input type="date" id="detailTaskDeadline" class="neo-input" style="padding: 8px 12px;">
+        </div>
+
+        <div class="dynamic-prop-box" id="propBoxChecklist" style="display: none;">
+          <div class="prop-box-header">
+            <span class="prop-box-title">☑️ Подзадачи (Чеклист)</span>
+            <button type="button" class="prop-remove-btn" id="removeChecklistBtn">Удалить ✕</button>
+          </div>
+          <div class="checklist-items" id="detailChecklistItems"></div>
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <input type="text" id="newSubtaskInput" class="neo-input" placeholder="Шаг чеклиста... (Enter)" style="padding: 8px 12px;">
+            <button type="button" class="neo-btn neo-btn-sm" id="addSubtaskBtn">+</button>
+          </div>
+        </div>
+
+        <div class="dynamic-prop-box" id="propBoxNote" style="display: none;">
+          <div class="prop-box-header">
+            <span class="prop-box-title">📝 Заметка / Ссылка</span>
+            <button type="button" class="prop-remove-btn" id="removeNoteBtn">Удалить ✕</button>
+          </div>
+          <textarea id="detailTaskNote" class="neo-input" rows="3" placeholder="Контекст, ссылка, комментарий к задаче..."></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+          <button type="button" class="neo-btn" id="deleteTaskBtn" style="color: #CF1322;">
+            🗑️ Удалить
+          </button>
+          <button type="submit" class="neo-btn neo-btn-primary">
+            💾 Сохранить
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: Инструкция установки для iOS -->
+  <div class="modal-overlay" id="iosInstallModal" role="dialog" aria-modal="true" aria-labelledby="iosInstallTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="iosInstallTitle">Установка на iPhone / iPad</h2>
+        <button class="modal-close-btn" id="closeIosInstallBtn" aria-label="Закрыть">✕</button>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px; font-size: 0.95rem; font-weight: 500;">
+        <p>Чтобы установить Life OS на экран вашего смартфона как родное приложение:</p>
+        <div class="task-item">
+          <span>1. Нажмите иконку <strong>«Поделиться»</strong> (квадрат со стрелкой вверх) в нижней панели Safari.</span>
+        </div>
+        <div class="task-item">
+          <span>2. Прокрутите меню вниз и выберите <strong>«На экран „Домой“»</strong> 📲</span>
+        </div>
+        <div class="task-item">
+          <span>3. Нажмите <strong>«Добавить»</strong> в верхнем правом углу. Готово!</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- АВТОРСКИЙ МОДАЛЬНЫЙ ДИАЛОГ -->
+  <div class="modal-overlay" id="customDialogModal" role="dialog" aria-modal="true" aria-labelledby="customDialogTitle">
+    <div class="modal-card custom-dialog-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="customDialogTitle">Сообщение</h2>
+        <button class="modal-close-btn" id="customDialogCloseBtn" aria-label="Закрыть">✕</button>
+      </div>
+      <p class="dialog-msg" id="customDialogMessage"></p>
+      
+      <div id="customDialogPromptBox" style="display: none; margin-top: 8px;">
+        <input type="text" id="customDialogInput" class="neo-input" autocomplete="off">
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" class="neo-btn" id="customDialogCancelBtn" style="display: none;">Отмена</button>
+        <button type="button" class="neo-btn neo-btn-primary" id="customDialogConfirmBtn">Ок</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модули приложения -->
+  <script src="assets/js/icons.js"></script>
+  <script src="assets/js/confetti.js"></script>
+  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/state.js"></script>
+  <script src="assets/js/sync.js"></script>
+  <script src="assets/js/backup.js"></script>
+  <script src="assets/js/ui.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+/* Базовые параметры чернил */
+.neo-border {
+  border: var(--border-width) solid var(--border-color);
+}
+
+/* 1. Механика кнопок */
+.neo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: var(--bg-card);
+  color: var(--ink-black);
+  border: var(--border-width) solid var(--border-color);
+  box-shadow: var(--shadow-distance) var(--shadow-distance) 0 var(--shadow-color);
+  font-family: var(--font-body);
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  text-decoration: none;
+  transition: transform var(--transition-tactile), box-shadow var(--transition-tactile);
+}
+
+/* В тёмной теме кнопки становятся бежевыми круассанами с шоколадным шрифтом */
+[data-theme="dark"] .neo-btn {
+  background-color: var(--bg-beige);
+  color: #1D130E;
+}
+
+.neo-btn:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--shadow-color);
+}
+
+.neo-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0px 0px 0 var(--shadow-color);
+}
+
+.neo-btn-primary {
+  background-color: var(--folder-amber);
+  color: #141414 !important;
+}
+
+.neo-btn-sm {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 var(--shadow-color);
+}
+.neo-btn-sm:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--shadow-color);
+}
+.neo-btn-sm:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 var(--shadow-color);
+}
+
+/* 2. Механика папок картотеки */
+.neo-folder {
+  position: relative;
+  padding-top: 14px;
+  cursor: pointer;
+  transition: transform var(--transition-tactile);
+  user-select: none;
+}
+
+.neo-folder:hover {
+  transform: translate(-3px, -3px);
+}
+
+.folder-tab {
+  position: absolute;
+  top: 0;
+  left: 14px;
+  width: 86px;
+  height: 18px;
+  background-color: var(--tab-color, var(--folder-amber));
+  border: var(--border-width) solid var(--border-color);
+  border-bottom: none;
+  border-radius: 9px 9px 0 0;
+  box-shadow: var(--shadow-distance) var(--shadow-distance) 0 var(--shadow-color);
+  z-index: 1;
+  transition: box-shadow var(--transition-tactile);
+}
+
+.neo-folder:hover .folder-tab {
+  box-shadow: 7px 7px 0 var(--shadow-color);
+}
+
+.folder-card {
+  position: relative;
+  z-index: 2;
+  background-color: var(--bg-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: 18px;
+  box-shadow: var(--shadow-distance) var(--shadow-distance) 0 var(--shadow-color);
+  padding: 16px 14px 18px 14px;
+  min-height: 146px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: box-shadow var(--transition-tactile);
+}
+
+.neo-folder:hover .folder-card {
+  box-shadow: 7px 7px 0 var(--shadow-color);
+}
+
+.folder-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.folder-icon-badge {
+  width: 40px;
+  height: 40px;
+  background-color: var(--tab-color, var(--folder-amber));
+  border: var(--border-width) solid var(--border-color);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #141414;
+}
+
+.folder-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.folder-title {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink-black);
+  margin-top: 10px;
+  line-height: 1.25;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.neo-card {
+  background-color: var(--bg-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: 18px;
+  box-shadow: var(--shadow-distance) var(--shadow-distance) 0 var(--shadow-color);
+  padding: 20px;
+}

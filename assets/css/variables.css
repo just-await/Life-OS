@@ -1,0 +1,36 @@
+:root {
+  /* Светлая тема (🥛 Молоко / Бумага) */
+  --bg-paper: #F6F3EB;
+  --bg-card: #FFFFFF;
+  --bg-subcard: #FAFAFA;
+  --bg-beige: #E6D5B8;
+  --ink-black: #141414;
+  --ink-muted: #595959;
+  --border-width: 2px;
+  --border-color: #141414;
+  --shadow-color: #141414;
+
+  --accent-focus: #FAAD14;
+  --accent-done: #52C41A;
+  --folder-amber: #FFD027;
+
+  --font-heading: 'Unbounded', system-ui, -apple-system, sans-serif;
+  --font-body: 'Golos Text', system-ui, -apple-system, sans-serif;
+
+  --shadow-distance: 4px;
+  --transition-tactile: 0.12s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ВКУСНАЯ ТЁМНАЯ ТЕМА BODREN (☕ Эспрессо, Горячий Круассан и Мята) */
+[data-theme="dark"] {
+  --bg-paper: #221714;       /* Глубокий благородный эспрессо (без зелени!) */
+  --bg-card: #2F211C;        /* Тёплый обжаренный мокко */
+  --bg-subcard: #3D2B24;     /* Кофейная пенка */
+  --bg-beige: #E8D4BE;       /* Хрустящий золотисто-бежевый круассан */
+  --ink-black: #FAF4ED;      /* Взбитые сливочные сливки / пенка */
+  --ink-muted: #BFA997;      /* Тёплая корица */
+  --border-color: #120B09;   /* Глубокий тёмный контур обжарки */
+  --shadow-color: #0C0705;   /* Плотная чернильная тень чашки */
+  --accent-done: #4EBA97;    /* Мятный акцент Bodren («Выбрать кофе») */
+  --folder-amber: #E89B38;   /* Карамельный сироп */
+}

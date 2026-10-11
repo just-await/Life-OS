@@ -1,5 +1,5 @@
-// Service Worker Life OS — Надежный оффлайн-движок v8
-const CACHE_NAME = 'life-os-offline-v8';
+// Service Worker Life OS — v9
+const CACHE_NAME = 'life-os-offline-v9';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -32,7 +32,7 @@ self.addEventListener('install', (event) => {
               await cache.put(url, response);
             }
           } catch (err) {
-            console.warn('[SW] Ошибка кэширования ресурса:', url);
+            console.warn('[SW] Ошибка кэширования:', url);
           }
         })
       );
@@ -55,84 +55,56 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
 
-  // 1. КЭШИРОВАНИЕ ВЕБ-ШРИФТОВ (Google Fonts: Unbounded и Golos Text для 100% оффлайна)
+  // Кэширование веб-шрифтов
   if (requestUrl.hostname === 'fonts.googleapis.com' || requestUrl.hostname === 'fonts.gstatic.com') {
     event.respondWith(
       caches.match(event.request).then((cached) => {
         if (cached) return cached;
-        return fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.ok) {
-              const clone = networkResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-            }
-            return networkResponse;
-          })
-          .catch(() => caches.match(event.request));
+        return fetch(event.request).then((response) => {
+          if (response && response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        }).catch(() => caches.match(event.request));
       })
     );
     return;
   }
 
-  // Запросы к облаку Яндекс Диска требуют реального интернета — их не перехватываем
+  // Запросы к сторонним сервисам (Яндекс Диск) НЕ перехватываем
   if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
-  // 2. НАВИГАЦИЯ (открытие приложения с таймаутом на плохой сети)
   if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
-      new Promise((resolve) => {
-        let isTimedOut = false;
-        const timer = setTimeout(async () => {
-          isTimedOut = true;
-          const cache = await caches.open(CACHE_NAME);
-          const cached = (await cache.match(event.request)) || (await cache.match('./index.html')) || (await cache.match('index.html'));
-          if (cached) resolve(cached);
-        }, 1200);
-
-        fetch(event.request)
-          .then(async (response) => {
-            clearTimeout(timer);
-            if (response && response.ok) {
-              const cache = await caches.open(CACHE_NAME);
-              cache.put(event.request, response.clone());
-              cache.put('./index.html', response.clone());
-            }
-            if (!isTimedOut) resolve(response);
-          })
-          .catch(async () => {
-            clearTimeout(timer);
+      fetch(event.request)
+        .then(async (response) => {
+          if (response && response.ok) {
             const cache = await caches.open(CACHE_NAME);
-            const cached = (await cache.match(event.request)) || (await cache.match('./index.html')) || (await cache.match('index.html'));
-            resolve(cached || new Response('Offline', { status: 503 }));
-          });
-      })
+            cache.put(event.request, response.clone());
+            cache.put('./index.html', response.clone());
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cache = await caches.open(CACHE_NAME);
+          return (await cache.match(event.request)) || (await cache.match('./index.html')) || (await cache.match('index.html'));
+        })
     );
     return;
   }
 
-  // 3. СТАТИЧЕСКИЕ ФАЙЛЫ ПРИЛОЖЕНИЯ
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.ok) {
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
-            }
-          })
-          .catch(() => {});
-        return cachedResponse;
-      }
-
-      return fetch(event.request).then((networkResponse) => {
+      const fetchPromise = fetch(event.request).then((networkResponse) => {
         if (networkResponse && networkResponse.ok) {
-          const clone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse.clone()));
         }
         return networkResponse;
-      });
+      }).catch(() => {});
+      return cachedResponse || fetchPromise;
     })
   );
 });

@@ -1,10 +1,8 @@
-// Модуль синхронизации (Яндекс Диск — чистый CORS без блокировок)
+// Модуль синхронизации (Яндекс Диск со встроенным диагностическим сканером)
 window.LifeSync = {
   yandexToken: null,
   isSyncing: false,
   autoSyncTimer: null,
-
-  // Статусы: 'NOT_CONNECTED' | 'SYNCED' | 'SYNCING' | 'OFFLINE' | 'AUTH_ERROR'
   status: 'NOT_CONNECTED',
 
   DEFAULT_CLIENT_ID: 'b8ac870907144a7ebdbcda02f5422fd7',
@@ -25,19 +23,11 @@ window.LifeSync = {
 
   setupLifecycleListeners() {
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        this.silentPull();
-      }
+      if (document.visibilityState === 'visible') this.silentPull();
     });
-
-    window.addEventListener('online', () => {
-      this.silentPull();
-    });
-
+    window.addEventListener('online', () => this.silentPull());
     window.addEventListener('offline', () => {
-      if (this.yandexToken) {
-        this.setStatus('OFFLINE');
-      }
+      if (this.yandexToken) this.setStatus('OFFLINE');
     });
   },
 
@@ -66,13 +56,102 @@ window.LifeSync = {
     window.location.href = authUrl;
   },
 
+  // ПОШАГОВЫЙ СКАНЕР ДИАГНОСТИКИ (ОПРЕДЕЛЯЕТ ТОЧНУЮ ПРИЧИНУ СБОЯ)
+  async runDiagnostic() {
+    const report = [];
+    report.push(`📌 Версия кода: v1.3-gh`);
+    report.push(`📌 Домен сайта: ${window.location.origin}`);
+    report.push(`📌 Токен в памяти: ${this.yandexToken ? `Есть (${this.yandexToken.slice(0, 7)}...)` : '❌ Отсутствует'}`);
+
+    if (!this.yandexToken) {
+      report.push(`\n❌ Ошибка: Сначала войдите в Яндекс ID или укажите токен.`);
+      return report.join('\n');
+    }
+
+    // Шаг 1: Доступность шлюза API Яндекса
+    report.push(`\n[Тест 1] Проверка доступа к cloud-api.yandex.net...`);
+    try {
+      const diskInfoRes = await fetch('https://cloud-api.yandex.net/v1/disk', {
+        headers: { Authorization: `OAuth ${this.yandexToken}` }
+      });
+      if (diskInfoRes.status === 401 || diskInfoRes.status === 403) {
+        report.push(`❌ Токен не принят Яндексом (HTTP ${diskInfoRes.status}). Нужен повторный вход.`);
+        return report.join('\n');
+      }
+      if (!diskInfoRes.ok) {
+        report.push(`❌ Шлюз Яндекса вернул ошибку HTTP ${diskInfoRes.status}`);
+        return report.join('\n');
+      }
+      report.push(`✓ Шлюз API доступен, токен действителен (HTTP 200 OK)`);
+    } catch (e) {
+      report.push(`❌ Блокировка шлюза API: ${e.message} (CORS / AdGuard / Блокировка DNS)`);
+      return report.join('\n');
+    }
+
+    // Шаг 2: Проверка ссылки на скачивание
+    report.push(`\n[Тест 2] Запрос ссылки на скачивание файла...`);
+    let downloadHref = null;
+    try {
+      const downMetaRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/download?path=app:/planner_data.json', {
+        headers: { Authorization: `OAuth ${this.yandexToken}` }
+      });
+      if (downMetaRes.status === 404) {
+        report.push(`ℹ️ Файл planner_data.json еще не создан в облаке (это норма при первой загрузке).`);
+      } else if (!downMetaRes.ok) {
+        report.push(`❌ Ошибка получения ссылки (HTTP ${downMetaRes.status})`);
+      } else {
+        const meta = await downMetaRes.json();
+        downloadHref = meta.href;
+        report.push(`✓ Ссылка на скачивание получена от Яндекса`);
+      }
+    } catch (e) {
+      report.push(`❌ Сбой запроса ссылки: ${e.message}`);
+    }
+
+    // Шаг 3: Тест скачивания (downloader.disk.yandex.ru)
+    if (downloadHref) {
+      report.push(`\n[Тест 3] Скачивание содержимого файла...`);
+      try {
+        const fileRes = await fetch(downloadHref);
+        if (!fileRes.ok) {
+          report.push(`❌ Сервер хранилища вернул HTTP ${fileRes.status}`);
+        } else {
+          const json = await fileRes.json();
+          report.push(`✓ Файл успешно прочитан из облака! Задач в облаке: ${(json.tasks || []).length}`);
+        }
+      } catch (e) {
+        report.push(`❌ Блокировка сервера скачивания: ${e.message}`);
+        report.push(`💡 Причина: downloader.disk.yandex.ru заблокирован браузером по политике CORS.`);
+      }
+    }
+
+    // Шаг 4: Тест ссылки на загрузку
+    report.push(`\n[Тест 4] Проверка ссылки на запись файла...`);
+    let uploadHref = null;
+    try {
+      const upMetaRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/upload?path=app:/planner_data.json&overwrite=true', {
+        headers: { Authorization: `OAuth ${this.yandexToken}` }
+      });
+      if (!upMetaRes.ok) {
+        report.push(`❌ Ошибка ссылки загрузки (HTTP ${upMetaRes.status})`);
+      } else {
+        const upMeta = await upMetaRes.json();
+        uploadHref = upMeta.href;
+        report.push(`✓ Ссылка на загрузку получена успешно`);
+      }
+    } catch (e) {
+      report.push(`❌ Сбой запроса загрузки: ${e.message}`);
+    }
+
+    report.push(`\n🏁 Диагностика завершена.`);
+    return report.join('\n');
+  },
+
   cleanOldTombstones(tombstones) {
     const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const cleaned = {};
     for (const [id, time] of Object.entries(tombstones || {})) {
-      if (time > thirtyDaysAgo) {
-        cleaned[id] = time;
-      }
+      if (time > thirtyDaysAgo) cleaned[id] = time;
     }
     return cleaned;
   },
@@ -105,7 +184,6 @@ window.LifeSync = {
       return tTime && tTime >= (updatedAt || 0);
     };
 
-    // Сферы
     const sphereMap = new Map();
     (local.spheres || []).forEach(s => {
       if (!isDeleted(s.id, s.updatedAt || s.createdAt)) sphereMap.set(s.id, s);
@@ -121,7 +199,6 @@ window.LifeSync = {
     });
     merged.spheres = Array.from(sphereMap.values());
 
-    // Проекты
     const projectMap = new Map();
     (local.projects || []).forEach(p => {
       if (!isDeleted(p.id, p.updatedAt || p.createdAt)) projectMap.set(p.id, p);
@@ -137,7 +214,6 @@ window.LifeSync = {
     });
     merged.projects = Array.from(projectMap.values());
 
-    // Задачи
     const taskMap = new Map();
     (local.tasks || []).forEach(t => {
       if (!isDeleted(t.id, t.updatedAt || t.createdAt)) taskMap.set(t.id, t);
@@ -155,15 +231,12 @@ window.LifeSync = {
     });
     merged.tasks = Array.from(taskMap.values());
 
-    // Инбокс
     const inboxMap = new Map();
     (local.inbox || []).forEach(i => {
       if (!isDeleted(i.id, i.createdAt)) inboxMap.set(i.id, i);
     });
     (remote.inbox || []).forEach(i => {
-      if (!isDeleted(i.id, i.createdAt) && !inboxMap.has(i.id)) {
-        inboxMap.set(i.id, i);
-      }
+      if (!isDeleted(i.id, i.createdAt) && !inboxMap.has(i.id)) inboxMap.set(i.id, i);
     });
     merged.inbox = Array.from(inboxMap.values());
 
@@ -198,7 +271,7 @@ window.LifeSync = {
     try {
       let remoteData = null;
 
-      // 1. Запрос метаданных на скачивание (без конфликтующего cache: no-store)
+      // 1. Метаданные скачивания
       const downMetaRes = await fetch(`https://cloud-api.yandex.net/v1/disk/resources/download?path=${encodeURIComponent(filePath)}&_ts=${cacheBuster}`, {
         headers: { Authorization: `OAuth ${this.yandexToken}` }
       });
@@ -209,29 +282,28 @@ window.LifeSync = {
       }
 
       if (downMetaRes.status === 404) {
-        // Файла ещё нет в облаке
         remoteData = null;
       } else if (!downMetaRes.ok) {
         throw new Error(`Ошибка сервиса Яндекса (HTTP ${downMetaRes.status})`);
       } else {
         const downMeta = await downMetaRes.json();
         
-        // 2. Скачивание самого файла по чистой ссылке без порчи хэш-подписи
+        // 2. Скачивание файла
         const fileRes = await fetch(downMeta.href);
         if (!fileRes.ok) {
-          throw new Error(`Ошибка чтения файла из Диска (HTTP ${fileRes.status})`);
+          throw new Error(`Ошибка чтения файла (HTTP ${fileRes.status})`);
         }
         remoteData = await fileRes.json();
       }
 
-      // 3. Объединение локальных данных с облачными
+      // 3. Слияние данных
       const localData = window.LifeState.data || window.LifeStorage.load();
       const mergedData = this.mergeData(localData, remoteData);
 
       window.LifeStorage.save(mergedData);
       window.LifeState.data = mergedData;
 
-      // 4. Запрос ссылки на сохранение
+      // 4. Ссылка на загрузку
       const upMetaRes = await fetch(`https://cloud-api.yandex.net/v1/disk/resources/upload?path=${encodeURIComponent(filePath)}&overwrite=true&_ts=${cacheBuster}`, {
         headers: { Authorization: `OAuth ${this.yandexToken}` }
       });
@@ -247,7 +319,7 @@ window.LifeSync = {
 
       const upMeta = await upMetaRes.json();
 
-      // 5. Отправка данных на Диск
+      // 5. Запись на Диск
       const uploadRes = await fetch(upMeta.href, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

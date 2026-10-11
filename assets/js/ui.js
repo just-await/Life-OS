@@ -248,6 +248,8 @@ window.LifeUI = {
     this.cloudStatusBadge = document.getElementById('cloudStatusBadge');
     this.modeMergeBtn = document.getElementById('modeMergeBtn');
     this.modeOverwriteBtn = document.getElementById('modeOverwriteBtn');
+    this.diagYandexBtn = document.getElementById('diagYandexBtn');
+    this.diagYandexConnectedBtn = document.getElementById('diagYandexConnectedBtn');
 
     this.installPwaBtn = document.getElementById('installPwaBtn');
     this.iosInstallModal = document.getElementById('iosInstallModal');
@@ -1511,6 +1513,15 @@ window.LifeUI = {
         this.showToast('Яндекс Диск отключен');
       }
     });
+
+    const runDiagHandler = async () => {
+      this.showToast('Запуск диагностики...');
+      const report = await window.LifeSync.runDiagnostic();
+      this.customAlert(report, 'Диагностика Яндекс Диска');
+    };
+
+    if (this.diagYandexBtn) this.diagYandexBtn.addEventListener('click', runDiagHandler);
+    if (this.diagYandexConnectedBtn) this.diagYandexConnectedBtn.addEventListener('click', runDiagHandler);
 
     this.downloadBackupBtn.addEventListener('click', () => {
       const fileName = window.LifeBackup.exportData();

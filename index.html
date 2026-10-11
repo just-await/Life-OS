@@ -197,7 +197,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <div>
-          <h2 class="modal-title" id="backupModalHeading">💾 Центр данных и Облако</h2>
+          <h2 class="modal-title" id="backupModalHeading">💾 Центр данных и Облако <span style="font-size: 0.7rem; color: var(--ink-muted); font-weight: 600;">(v1.3-gh)</span></h2>
           <p style="font-size: 0.8rem; color: var(--ink-muted); margin-top: 2px;">Local-First: независимость и приватность.</p>
         </div>
         <button class="modal-close-btn" id="closeBackupModalBtn" aria-label="Закрыть">✕</button>
@@ -217,26 +217,34 @@
         </div>
         <p class="backup-box-desc">Бесплатная и приватная синхронизация без серверов. Файл <code>planner_data.json</code> сохраняется в изолированную папку «Приложения/Life OS» на вашем личном Диске.</p>
         
-        <!-- Состояние: НЕ подключено -->
+        <!-- Блок Яндекс Диска с диагностикой -->
         <div id="yandexNotConnectedBlock" style="display: flex; flex-direction: column; gap: 8px;">
           <button type="button" class="neo-btn neo-btn-primary" id="loginYandexBtn" style="width: 100%;">
             ⚡ Войти через Яндекс ID (в 1 клик)
           </button>
-          <button type="button" class="neo-btn neo-btn-sm" id="manualYandexTokenBtn" style="width: 100%;">
-            🔑 Указать токен вручную
-          </button>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" class="neo-btn neo-btn-sm" id="manualYandexTokenBtn" style="flex: 1;">
+              🔑 Ввести токен
+            </button>
+            <button type="button" class="neo-btn neo-btn-sm" id="diagYandexBtn" style="flex: 1;" title="Проверить каждый шаг соединения">
+              🔍 Диагностика
+            </button>
+          </div>
         </div>
 
-        <!-- Состояние: ПОДКЛЮЧЕНО -->
-        <div id="yandexConnectedBlock" style="display: none; gap: 8px; flex-wrap: wrap;">
-          <button type="button" class="neo-btn neo-btn-primary neo-btn-sm" id="syncYandexNowBtn" style="flex: 1;">
-            Синхронизировать сейчас 🔄
-          </button>
-          <button type="button" class="neo-btn neo-btn-sm" id="unlinkYandexBtn" style="color: #CF1322;" title="Отвязать токен">
-            Отключить
+        <div id="yandexConnectedBlock" style="display: none; flex-direction: column; gap: 8px;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="neo-btn neo-btn-primary neo-btn-sm" id="syncYandexNowBtn" style="flex: 1;">
+              Синхронизировать сейчас 🔄
+            </button>
+            <button type="button" class="neo-btn neo-btn-sm" id="unlinkYandexBtn" style="color: #CF1322;" title="Отвязать токен">
+              Отключить
+            </button>
+          </div>
+          <button type="button" class="neo-btn neo-btn-sm" id="diagYandexConnectedBtn" style="width: 100%;">
+            🔍 Диагностика связи с облаком
           </button>
         </div>
-      </div>
 
       <!-- Блок 2: Ручной бэкап (Экспорт) -->
       <div class="backup-section-box">

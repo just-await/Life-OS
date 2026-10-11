@@ -174,7 +174,6 @@ body {
   border-radius: 12px;
   box-shadow: 2px 2px 0 var(--shadow-color);
   transition: transform var(--transition-tactile);
-  user-select: none;
   touch-action: manipulation;
 }
 

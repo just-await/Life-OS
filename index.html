@@ -190,34 +190,32 @@
 
     </main>
 
-  </div>
+  </div> <!-- закрытие .container -->
 
-  <!-- МОДАЛЬНОЕ ОКНО: Центр данных и Синхронизации с Яндекс Диском -->
+  <!-- МОДАЛЬНОЕ ОКНО 1: Центр данных и Облачной синхронизации -->
   <div class="modal-overlay" id="backupModal" role="dialog" aria-modal="true" aria-labelledby="backupModalHeading">
     <div class="modal-card">
       <div class="modal-header">
         <div>
-          <h2 class="modal-title" id="backupModalHeading">💾 Центр данных и Облако <span style="font-size: 0.7rem; color: var(--ink-muted); font-weight: 600;">(v1.3-gh)</span></h2>
+          <h2 class="modal-title" id="backupModalHeading">💾 Центр данных и Облако</h2>
           <p style="font-size: 0.8rem; color: var(--ink-muted); margin-top: 2px;">Local-First: независимость и приватность.</p>
         </div>
         <button class="modal-close-btn" id="closeBackupModalBtn" aria-label="Закрыть">✕</button>
       </div>
 
-      <!-- Статус памяти -->
       <div class="backup-stats-pill">
         <span>Память базы: <strong id="backupMemoryKb">0.0 КБ</strong></span>
         <span id="cloudStatusBadge" style="color: var(--accent-done);">● 100% Локально</span>
       </div>
 
-      <!-- Блок 1: Синхронизация с Яндекс Диском -->
       <div class="backup-section-box">
         <div class="backup-box-title">
           <span>🟡 Яндекс Диск</span>
           <span id="yandexSyncLabel" class="sync-time-badge">Не подключен</span>
         </div>
-        <p class="backup-box-desc">Бесплатная и приватная синхронизация без серверов. Файл <code>planner_data.json</code> сохраняется в изолированную папку «Приложения/Life OS» на вашем личном Диске.</p>
+        <p class="backup-box-desc">Бесплатная и приватная синхронизация без серверов. Файл <code>planner_data.json</code> сохраняется в изолированную папку «Приложения/Life-OS» на вашем личном Диске.</p>
         
-        <!-- Блок Яндекс Диска с диагностикой -->
+        <!-- Состояние: НЕ подключено -->
         <div id="yandexNotConnectedBlock" style="display: flex; flex-direction: column; gap: 8px;">
           <button type="button" class="neo-btn neo-btn-primary" id="loginYandexBtn" style="width: 100%;">
             ⚡ Войти через Яндекс ID (в 1 клик)
@@ -232,6 +230,7 @@
           </div>
         </div>
 
+        <!-- Состояние: ПОДКЛЮЧЕНО -->
         <div id="yandexConnectedBlock" style="display: none; flex-direction: column; gap: 8px;">
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button type="button" class="neo-btn neo-btn-primary neo-btn-sm" id="syncYandexNowBtn" style="flex: 1;">
@@ -245,8 +244,8 @@
             🔍 Диагностика связи с облаком
           </button>
         </div>
+      </div>
 
-      <!-- Блок 2: Ручной бэкап (Экспорт) -->
       <div class="backup-section-box">
         <h3 class="backup-box-title">📥 Скачать бэкап (.json)</h3>
         <p class="backup-box-desc">Мгновенный экспорт всех сфер, проектов и мыслей в один независимый файл.</p>
@@ -255,7 +254,6 @@
         </button>
       </div>
 
-      <!-- Блок 3: Восстановление из файла -->
       <div class="backup-section-box">
         <h3 class="backup-box-title">📤 Восстановить из файла</h3>
         <p class="backup-box-desc">Выберите файл для восстановления. Умное слияние объединит задачи с разных устройств без потерь.</p>
@@ -275,7 +273,6 @@
         </div>
       </div>
 
-      <!-- Блок 4: Очистка и сброс до нуля -->
       <div style="margin-top: 6px;">
         <button type="button" class="neo-btn" id="resetAllDataBtn" style="width: 100%; color: #CF1322; border-color: #CF1322;">
           🗑️ Очистить все данные (Сбросить до нуля)
@@ -284,7 +281,7 @@
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО: Инбокс -->
+  <!-- МОДАЛЬНОЕ ОКНО 2: Инбокс -->
   <div class="modal-overlay" id="inboxModal" role="dialog" aria-modal="true" aria-labelledby="inboxModalTitle">
     <div class="modal-card">
       <div class="modal-header">
@@ -304,7 +301,7 @@
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО: Перенос мысли из Инбокса в проект -->
+  <!-- МОДАЛЬНОЕ ОКНО 3: Перенос мысли из Инбокса в проект -->
   <div class="modal-overlay" id="inboxTriageModal" role="dialog" aria-modal="true" aria-labelledby="triageModalTitle">
     <div class="modal-card">
       <div class="modal-header">
@@ -317,7 +314,7 @@
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО: Создание / Редактирование Сферы -->
+  <!-- МОДАЛЬНОЕ ОКНО 4: Создание / Редактирование Сферы -->
   <div class="modal-overlay" id="addSphereModal" role="dialog" aria-modal="true" aria-labelledby="sphereModalTitle">
     <div class="modal-card">
       <div class="modal-header">
@@ -356,7 +353,7 @@
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО: Создание / Редактирование Проекта -->
+  <!-- МОДАЛЬНОЕ ОКНО 5: Создание / Редактирование Проекта -->
   <div class="modal-overlay" id="addProjectModal" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
     <div class="modal-card">
       <div class="modal-header">
@@ -395,7 +392,7 @@
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО: Карточка задачи -->
+  <!-- МОДАЛЬНОЕ ОКНО 6: Карточка задачи -->
   <div class="modal-overlay" id="taskDetailModal" role="dialog" aria-modal="true" aria-labelledby="taskDetailModalTitle">
     <div class="modal-card">
       <div class="modal-header">
@@ -460,7 +457,7 @@
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО: Инструкция установки для iOS -->
+  <!-- МОДАЛЬНОЕ ОКНО 7: Инструкция установки для iOS -->
   <div class="modal-overlay" id="iosInstallModal" role="dialog" aria-modal="true" aria-labelledby="iosInstallTitle">
     <div class="modal-card">
       <div class="modal-header">
@@ -482,7 +479,7 @@
     </div>
   </div>
 
-  <!-- АВТОРСКИЙ МОДАЛЬНЫЙ ДИАЛОГ -->
+  <!-- МОДАЛЬНОЕ ОКНО 8: Авторский диалог (Подтверждение и алерты) -->
   <div class="modal-overlay" id="customDialogModal" role="dialog" aria-modal="true" aria-labelledby="customDialogTitle">
     <div class="modal-card custom-dialog-card">
       <div class="modal-header">
@@ -502,7 +499,7 @@
     </div>
   </div>
 
-  <!-- Модули приложения -->
+  <!-- Скрипты приложения -->
   <script src="assets/js/icons.js"></script>
   <script src="assets/js/confetti.js"></script>
   <script src="assets/js/storage.js"></script>

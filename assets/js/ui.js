@@ -1,4 +1,4 @@
-// Модуль интерфейса Life OS (с надежными модалками и безопасными обработчиками)
+// Модуль интерфейса Life OS (с честными статусами и точкой в шапке)
 window.LifeUI = {
   viewDashboard: null,
   viewSphere: null,
@@ -102,8 +102,6 @@ window.LifeUI = {
   modeMergeBtn: null,
   modeOverwriteBtn: null,
   currentImportMode: 'merge',
-  diagYandexBtn: null,
-  diagYandexConnectedBtn: null,
 
   installPwaBtn: null,
   iosInstallModal: null,
@@ -311,6 +309,7 @@ window.LifeUI = {
     return `${d.getDate()} ${months[d.getMonth()]}, ${timeStr}`;
   },
 
+  // 8. ЧЕСТНЫЙ СТАТУС ОБЛАКА И ТОЧКА В ШАПКЕ
   updateCloudStatusUI() {
     const status = window.LifeSync ? window.LifeSync.status : 'NOT_CONNECTED';
     const lastSyncTs = localStorage.getItem('LIFE_OS_LAST_SYNC_TS');
@@ -326,13 +325,11 @@ window.LifeUI = {
           this.headerSyncDot.classList.add('sync-dot-synced');
           this.headerSyncDot.title = `Синхронизировано (${timeLabel})`;
         }
-        if (this.cloudStatusBadge) {
-          this.cloudStatusBadge.textContent = '● Облако (Яндекс Диск)';
-          this.cloudStatusBadge.style.color = 'var(--accent-done)';
-        }
-        if (this.yandexSyncLabel) this.yandexSyncLabel.textContent = `Синхр: ${timeLabel}`;
-        if (this.yandexNotConnectedBlock) this.yandexNotConnectedBlock.style.display = 'none';
-        if (this.yandexConnectedBlock) this.yandexConnectedBlock.style.display = 'flex';
+        this.cloudStatusBadge.textContent = '● Облако (Яндекс Диск)';
+        this.cloudStatusBadge.style.color = 'var(--accent-done)';
+        this.yandexSyncLabel.textContent = `Синхр: ${timeLabel}`;
+        this.yandexNotConnectedBlock.style.display = 'none';
+        this.yandexConnectedBlock.style.display = 'flex';
         break;
 
       case 'SYNCING':
@@ -340,10 +337,8 @@ window.LifeUI = {
           this.headerSyncDot.classList.add('sync-dot-syncing');
           this.headerSyncDot.title = 'Идет синхронизация...';
         }
-        if (this.cloudStatusBadge) {
-          this.cloudStatusBadge.textContent = '⏳ Синхронизация...';
-          this.cloudStatusBadge.style.color = 'var(--folder-amber)';
-        }
+        this.cloudStatusBadge.textContent = '⏳ Синхронизация...';
+        this.cloudStatusBadge.style.color = 'var(--folder-amber)';
         break;
 
       case 'OFFLINE':
@@ -351,13 +346,11 @@ window.LifeUI = {
           this.headerSyncDot.classList.add('sync-dot-offline');
           this.headerSyncDot.title = 'Офлайн: сохранено на устройстве';
         }
-        if (this.cloudStatusBadge) {
-          this.cloudStatusBadge.textContent = '● Офлайн (сохранено на устройстве)';
-          this.cloudStatusBadge.style.color = 'var(--accent-focus)';
-        }
-        if (this.yandexSyncLabel) this.yandexSyncLabel.textContent = `Синхр: ${timeLabel} (Офлайн)`;
-        if (this.yandexNotConnectedBlock) this.yandexNotConnectedBlock.style.display = 'none';
-        if (this.yandexConnectedBlock) this.yandexConnectedBlock.style.display = 'flex';
+        this.cloudStatusBadge.textContent = '● Офлайн (сохранено на устройстве)';
+        this.cloudStatusBadge.style.color = 'var(--accent-focus)';
+        this.yandexSyncLabel.textContent = `Синхр: ${timeLabel} (Офлайн)`;
+        this.yandexNotConnectedBlock.style.display = 'none';
+        this.yandexConnectedBlock.style.display = 'flex';
         break;
 
       case 'AUTH_ERROR':
@@ -365,13 +358,12 @@ window.LifeUI = {
           this.headerSyncDot.classList.add('sync-dot-error');
           this.headerSyncDot.title = 'Ошибка: неверный токен Яндекса';
         }
-        if (this.cloudStatusBadge) {
-          this.cloudStatusBadge.textContent = '● Ошибка: неверный токен';
-          this.cloudStatusBadge.style.color = '#CF1322';
-        }
-        if (this.yandexSyncLabel) this.yandexSyncLabel.textContent = 'Требуется вход';
-        if (this.yandexNotConnectedBlock) this.yandexNotConnectedBlock.style.display = 'flex';
-        if (this.yandexConnectedBlock) this.yandexConnectedBlock.style.display = 'none';
+        this.cloudStatusBadge.textContent = '● Ошибка: неверный токен';
+        this.cloudStatusBadge.style.color = '#CF1322';
+        this.yandexSyncLabel.textContent = 'Требуется вход';
+        // Возвращаем кнопки входа, чтобы можно было исправить токен
+        this.yandexNotConnectedBlock.style.display = 'flex';
+        this.yandexConnectedBlock.style.display = 'none';
         break;
 
       case 'NOT_CONNECTED':
@@ -379,13 +371,11 @@ window.LifeUI = {
         if (this.headerSyncDot) {
           this.headerSyncDot.classList.add('sync-dot-none');
         }
-        if (this.cloudStatusBadge) {
-          this.cloudStatusBadge.textContent = '● 100% Локально';
-          this.cloudStatusBadge.style.color = 'var(--accent-done)';
-        }
-        if (this.yandexSyncLabel) this.yandexSyncLabel.textContent = 'Не подключен';
-        if (this.yandexNotConnectedBlock) this.yandexNotConnectedBlock.style.display = 'flex';
-        if (this.yandexConnectedBlock) this.yandexConnectedBlock.style.display = 'none';
+        this.cloudStatusBadge.textContent = '● 100% Локально';
+        this.cloudStatusBadge.style.color = 'var(--accent-done)';
+        this.yandexSyncLabel.textContent = 'Не подключен';
+        this.yandexNotConnectedBlock.style.display = 'flex';
+        this.yandexConnectedBlock.style.display = 'none';
         break;
     }
   },
@@ -467,20 +457,20 @@ window.LifeUI = {
   },
 
   closeCustomDialog(result) {
-    if (this.customDialogModal) this.customDialogModal.classList.remove('active');
+    this.customDialogModal.classList.remove('active');
     if (this.activeDialogResolver) {
       this.activeDialogResolver(result);
       this.activeDialogResolver = null;
     }
   },
 
-  // НАВИГАЦИЯ
+  // 1. НАВИГАЦИЯ
   showDashboard() {
     window.LifeState.activeSphereId = null;
     window.LifeState.activeProjectId = null;
-    if (this.viewSphere) this.viewSphere.classList.remove('active');
-    if (this.viewProject) this.viewProject.classList.remove('active');
-    if (this.viewDashboard) this.viewDashboard.classList.add('active');
+    this.viewSphere.classList.remove('active');
+    this.viewProject.classList.remove('active');
+    this.viewDashboard.classList.add('active');
     this.renderSpheres();
     this.renderFocusTasks();
     this.renderInbox();
@@ -496,15 +486,13 @@ window.LifeUI = {
 
     window.LifeState.activeSphereId = sphereId;
     window.LifeState.activeProjectId = null;
-    if (this.viewDashboard) this.viewDashboard.classList.remove('active');
-    if (this.viewProject) this.viewProject.classList.remove('active');
-    if (this.viewSphere) this.viewSphere.classList.add('active');
+    this.viewDashboard.classList.remove('active');
+    this.viewProject.classList.remove('active');
+    this.viewSphere.classList.add('active');
 
-    if (this.sphereBannerTitle) this.sphereBannerTitle.textContent = sphere.title;
-    if (this.sphereBannerIcon) {
-      this.sphereBannerIcon.innerHTML = window.LifeIcons.get(sphere.icon);
-      this.sphereBannerIcon.style.backgroundColor = this.safeColor(sphere.color);
-    }
+    this.sphereBannerTitle.textContent = sphere.title;
+    this.sphereBannerIcon.innerHTML = window.LifeIcons.get(sphere.icon);
+    this.sphereBannerIcon.style.backgroundColor = this.safeColor(sphere.color);
 
     this.renderSphereProjects();
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -519,27 +507,24 @@ window.LifeUI = {
     }
 
     window.LifeState.activeProjectId = projectId;
-    if (this.viewSphere) this.viewSphere.classList.remove('active');
-    if (this.viewProject) this.viewProject.classList.add('active');
+    this.viewSphere.classList.remove('active');
+    this.viewProject.classList.add('active');
 
-    if (this.projectBannerTitle) this.projectBannerTitle.textContent = project.title;
-    if (this.projectBannerIcon) {
-      this.projectBannerIcon.innerHTML = window.LifeIcons.get(project.icon || 'target');
-      this.projectBannerIcon.style.backgroundColor = this.safeColor(project.color || '#FFD027');
-    }
+    this.projectBannerTitle.textContent = project.title;
+    this.projectBannerIcon.innerHTML = window.LifeIcons.get(project.icon || 'target');
+    this.projectBannerIcon.style.backgroundColor = this.safeColor(project.color || '#FFD027');
 
     this.renderProjectTasks();
     window.scrollTo({ top: 0, behavior: 'instant' });
   },
 
+  // 2. СЕТКА ПРОЕКТОВ
   renderSphereProjects() {
     const sphereId = window.LifeState.activeSphereId;
-    if (!sphereId || !this.projectsGrid) return;
+    if (!sphereId) return;
 
     const stats = window.LifeState.getSphereStats(sphereId);
-    if (this.sphereBannerMeta) {
-      this.sphereBannerMeta.textContent = `${stats.projectsCount} ${this.declensionProjects(stats.projectsCount)} • ${stats.tasksCount} ${this.declensionTasks(stats.tasksCount)}`;
-    }
+    this.sphereBannerMeta.textContent = `${stats.projectsCount} ${this.declensionProjects(stats.projectsCount)} • ${stats.tasksCount} ${this.declensionTasks(stats.tasksCount)}`;
 
     const projects = window.LifeState.getProjectsBySphere(sphereId);
 
@@ -658,17 +643,14 @@ window.LifeUI = {
     }
   },
 
+  // 3. ЗАДАЧИ ВНУТРИ ПРОЕКТА
   renderProjectTasks() {
     const projectId = window.LifeState.activeProjectId;
-    if (!projectId || !this.projectTasksList) return;
+    if (!projectId) return;
 
     const pStats = window.LifeState.getProjectStats(projectId);
-    if (this.projectBannerMeta) {
-      this.projectBannerMeta.textContent = `${pStats.completed} из ${pStats.total} ${this.declensionTasks(pStats.total)} закрыто`;
-    }
-    if (this.projectBannerProgressBadge) {
-      this.projectBannerProgressBadge.textContent = `${pStats.percent}%`;
-    }
+    this.projectBannerMeta.textContent = `${pStats.completed} из ${pStats.total} ${this.declensionTasks(pStats.total)} закрыто`;
+    this.projectBannerProgressBadge.textContent = `${pStats.percent}%`;
 
     const tasks = window.LifeState.getTasksByProject(projectId);
 
@@ -763,6 +745,7 @@ window.LifeUI = {
     });
   },
 
+  // 4. ДЕТАЛЬНАЯ МОДАЛКА ЗАДАЧИ
   openTaskDetailModal(taskId) {
     const task = window.LifeState.getTask(taskId);
     if (!task) return;
@@ -828,6 +811,7 @@ window.LifeUI = {
     });
   },
 
+  // 5. ФОКУС ДНЯ
   renderFocusTasks() {
     if (!this.focusList) return;
     const tasks = window.LifeState.getFocusTasks();
@@ -929,6 +913,7 @@ window.LifeUI = {
     });
   },
 
+  // 6. ИНБОКС
   renderInbox() {
     const items = window.LifeState.getInbox();
     
@@ -1011,7 +996,7 @@ window.LifeUI = {
       opt.addEventListener('click', () => {
         const pId = opt.getAttribute('data-target-project');
         window.LifeState.moveInboxThoughtToProject(this.activeTriageThoughtId, pId);
-        if (this.inboxTriageModal) this.inboxTriageModal.classList.remove('active');
+        this.inboxTriageModal.classList.remove('active');
         this.renderInbox();
         this.renderSpheres();
         this.showToast('Мысль превращена в задачу проекта!');
@@ -1019,9 +1004,10 @@ window.LifeUI = {
       });
     });
 
-    if (this.inboxTriageModal) this.inboxTriageModal.classList.add('active');
+    this.inboxTriageModal.classList.add('active');
   },
 
+  // 7. СФЕРЫ В КАРТОТЕКЕ
   renderSpheres() {
     if (!this.spheresGrid) return;
     const spheres = window.LifeState.getSpheres();
@@ -1084,6 +1070,7 @@ window.LifeUI = {
     });
   },
 
+  // АВТОСКРОЛЛ ПРИ ПЕРЕТАСКИВАНИИ
   startAutoScroll() {
     if (this.autoScrollRaf) return;
     const step = () => {
@@ -1294,6 +1281,7 @@ window.LifeUI = {
     container.addEventListener('touchcancel', finishTouch);
   },
 
+  // 9. СОБЫТИЯ
   bindEvents() {
     if (this.themeToggleBtnMobile) {
       this.themeToggleBtnMobile.addEventListener('click', () => this.toggleTheme());
@@ -1302,18 +1290,14 @@ window.LifeUI = {
       this.themeToggleBtnDesktop.addEventListener('click', () => this.toggleTheme());
     }
 
-    if (this.backToDashboardBtn) {
-      this.backToDashboardBtn.addEventListener('click', () => this.showDashboard());
-    }
-    if (this.backToSphereBtn) {
-      this.backToSphereBtn.addEventListener('click', () => {
-        if (window.LifeState.activeSphereId) {
-          this.showSphere(window.LifeState.activeSphereId);
-        } else {
-          this.showDashboard();
-        }
-      });
-    }
+    this.backToDashboardBtn.addEventListener('click', () => this.showDashboard());
+    this.backToSphereBtn.addEventListener('click', () => {
+      if (window.LifeState.activeSphereId) {
+        this.showSphere(window.LifeState.activeSphereId);
+      } else {
+        this.showDashboard();
+      }
+    });
 
     if (this.clearCompletedFocusBtn) {
       this.clearCompletedFocusBtn.addEventListener('click', () => {
@@ -1324,267 +1308,211 @@ window.LifeUI = {
       });
     }
 
-    if (this.deleteSphereBtn) {
-      this.deleteSphereBtn.addEventListener('click', async () => {
-        const sId = window.LifeState.activeSphereId;
-        if (sId) {
-          const confirmed = await this.customConfirm('Удалить эту сферу и все входящие в нее проекты и задачи? Это действие необратимо.', 'Удаление сферы');
-          if (confirmed) {
-            window.LifeState.deleteSphere(sId);
-            this.showToast('Сфера удалена');
-            this.showDashboard();
-            if (window.LifeSync) window.LifeSync.triggerAutoSync();
-          }
-        }
-      });
-    }
-
-    if (this.editSphereBtn) {
-      this.editSphereBtn.addEventListener('click', () => {
-        const sId = window.LifeState.activeSphereId;
-        const sphere = window.LifeState.getSphere(sId);
-        if (!sphere) return;
-
-        this.editingSphereId = sphere.id;
-        if (this.sphereModalTitle) this.sphereModalTitle.textContent = 'Редактировать сферу';
-        if (this.sphereSubmitBtn) this.sphereSubmitBtn.textContent = '💾 Сохранить изменения';
-        const titleInput = document.getElementById('sphereTitleInput');
-        if (titleInput) titleInput.value = sphere.title;
-
-        this.sphereSelectedIcon = sphere.icon || 'folder';
-        this.sphereSelectedColor = sphere.color || '#FFD027';
-        this.updateSphereModalPickers();
-
-        if (this.addSphereModal) this.addSphereModal.classList.add('active');
-      });
-    }
-
-    if (this.deleteProjectBtn) {
-      this.deleteProjectBtn.addEventListener('click', async () => {
-        const pId = window.LifeState.activeProjectId;
-        if (pId) {
-          const confirmed = await this.customConfirm('Удалить этот проект и все его задачи? Это действие необратимо.', 'Удаление проекта');
-          if (confirmed) {
-            const sphereId = window.LifeState.activeSphereId;
-            window.LifeState.deleteProject(pId);
-            this.showToast('Проект удален');
-            this.showSphere(sphereId);
-            if (window.LifeSync) window.LifeSync.triggerAutoSync();
-          }
-        }
-      });
-    }
-
-    if (this.editProjectBtn) {
-      this.editProjectBtn.addEventListener('click', () => {
-        const pId = window.LifeState.activeProjectId;
-        const project = window.LifeState.getProject(pId);
-        if (!project) return;
-
-        this.editingProjectId = project.id;
-        if (this.projectModalTitle) this.projectModalTitle.textContent = 'Редактировать проект';
-        if (this.projectSubmitBtn) this.projectSubmitBtn.textContent = '💾 Сохранить изменения';
-        const titleInput = document.getElementById('projectTitleInput');
-        if (titleInput) titleInput.value = project.title;
-
-        this.projectSelectedIcon = project.icon || 'target';
-        this.projectSelectedColor = project.color || '#FFD027';
-        this.updateProjectModalPickers();
-
-        if (this.addProjectModal) this.addProjectModal.classList.add('active');
-      });
-    }
-
-    if (this.projectQuickTaskForm) {
-      this.projectQuickTaskForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const title = this.projectQuickTaskInput.value.trim();
-        const pId = window.LifeState.activeProjectId;
-
-        if (title && pId) {
-          window.LifeState.addTask({ projectId: pId, title });
-          this.projectQuickTaskInput.value = '';
-          this.renderProjectTasks();
+    this.deleteSphereBtn.addEventListener('click', async () => {
+      const sId = window.LifeState.activeSphereId;
+      if (sId) {
+        const confirmed = await this.customConfirm('Удалить эту сферу и все входящие в нее проекты и задачи? Это действие необратимо.', 'Удаление сферы');
+        if (confirmed) {
+          window.LifeState.deleteSphere(sId);
+          this.showToast('Сфера удалена');
+          this.showDashboard();
           if (window.LifeSync) window.LifeSync.triggerAutoSync();
         }
-      });
-    }
+      }
+    });
 
-    if (this.addSphereBtn) {
-      this.addSphereBtn.addEventListener('click', () => {
-        this.editingSphereId = null;
-        if (this.sphereModalTitle) this.sphereModalTitle.textContent = 'Новая сфера жизни';
-        if (this.sphereSubmitBtn) this.sphereSubmitBtn.textContent = '+ Создать сферу';
-        const titleInput = document.getElementById('sphereTitleInput');
-        if (titleInput) titleInput.value = '';
-        this.updateSphereModalPickers();
-        if (this.addSphereModal) this.addSphereModal.classList.add('active');
-        setTimeout(() => { if (titleInput) titleInput.focus(); }, 100);
-      });
-    }
-    if (this.closeModalBtn) {
-      this.closeModalBtn.addEventListener('click', () => {
-        if (this.addSphereModal) this.addSphereModal.classList.remove('active');
-      });
-    }
+    this.editSphereBtn.addEventListener('click', () => {
+      const sId = window.LifeState.activeSphereId;
+      const sphere = window.LifeState.getSphere(sId);
+      if (!sphere) return;
 
-    if (this.addProjectBtn) {
-      this.addProjectBtn.addEventListener('click', () => {
-        this.editingProjectId = null;
-        if (this.projectModalTitle) this.projectModalTitle.textContent = 'Новый проект';
-        if (this.projectSubmitBtn) this.projectSubmitBtn.textContent = '+ Создать блокнот проекта';
-        const titleInput = document.getElementById('projectTitleInput');
-        if (titleInput) titleInput.value = '';
-        this.updateProjectModalPickers();
-        if (this.addProjectModal) this.addProjectModal.classList.add('active');
-        setTimeout(() => { if (titleInput) titleInput.focus(); }, 100);
-      });
-    }
-    if (this.closeProjectModalBtn) {
-      this.closeProjectModalBtn.addEventListener('click', () => {
-        if (this.addProjectModal) this.addProjectModal.classList.remove('active');
-      });
-    }
+      this.editingSphereId = sphere.id;
+      this.sphereModalTitle.textContent = 'Редактировать сферу';
+      this.sphereSubmitBtn.textContent = '💾 Сохранить изменения';
+      document.getElementById('sphereTitleInput').value = sphere.title;
 
-    if (this.addProjectForm) {
-      this.addProjectForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const input = document.getElementById('projectTitleInput');
-        const title = input.value.trim();
-        const sphereId = window.LifeState.activeSphereId;
+      this.sphereSelectedIcon = sphere.icon || 'folder';
+      this.sphereSelectedColor = sphere.color || '#FFD027';
+      this.updateSphereModalPickers();
 
-        if (title) {
-          if (this.editingProjectId) {
-            window.LifeState.updateProject(this.editingProjectId, {
-              title: title,
-              icon: this.projectSelectedIcon,
-              color: this.projectSelectedColor
-            });
-            this.showToast('Проект обновлен');
-            this.showProject(this.editingProjectId);
-          } else if (sphereId) {
-            window.LifeState.addProject({
-              sphereId: sphereId,
-              title: title,
-              icon: this.projectSelectedIcon,
-              color: this.projectSelectedColor
-            });
-            this.showToast('Проект создан');
-            this.renderSphereProjects();
-          }
+      this.addSphereModal.classList.add('active');
+    });
 
-          input.value = '';
-          if (this.addProjectModal) this.addProjectModal.classList.remove('active');
+    this.deleteProjectBtn.addEventListener('click', async () => {
+      const pId = window.LifeState.activeProjectId;
+      if (pId) {
+        const confirmed = await this.customConfirm('Удалить этот проект и все его задачи? Это действие необратимо.', 'Удаление проекта');
+        if (confirmed) {
+          const sphereId = window.LifeState.activeSphereId;
+          window.LifeState.deleteProject(pId);
+          this.showToast('Проект удален');
+          this.showSphere(sphereId);
           if (window.LifeSync) window.LifeSync.triggerAutoSync();
         }
-      });
-    }
+      }
+    });
 
-    if (this.inboxBtn) {
-      this.inboxBtn.addEventListener('click', () => {
-        this.renderInbox();
-        if (this.inboxModal) this.inboxModal.classList.add('active');
-      });
-    }
-    if (this.closeInboxBtn) {
-      this.closeInboxBtn.addEventListener('click', () => {
-        if (this.inboxModal) this.inboxModal.classList.remove('active');
-      });
-    }
+    this.editProjectBtn.addEventListener('click', () => {
+      const pId = window.LifeState.activeProjectId;
+      const project = window.LifeState.getProject(pId);
+      if (!project) return;
 
-    if (this.closeInboxTriageBtn) {
-      this.closeInboxTriageBtn.addEventListener('click', () => {
-        if (this.inboxTriageModal) this.inboxTriageModal.classList.remove('active');
-      });
-    }
+      this.editingProjectId = project.id;
+      this.projectModalTitle.textContent = 'Редактировать проект';
+      this.projectSubmitBtn.textContent = '💾 Сохранить изменения';
+      document.getElementById('projectTitleInput').value = project.title;
 
-    if (this.closeTaskDetailBtn) {
-      this.closeTaskDetailBtn.addEventListener('click', () => {
-        if (this.taskDetailModal) this.taskDetailModal.classList.remove('active');
-      });
-    }
-    if (this.closeIosInstallBtn) {
-      this.closeIosInstallBtn.addEventListener('click', () => {
-        if (this.iosInstallModal) this.iosInstallModal.classList.remove('active');
-      });
-    }
+      this.projectSelectedIcon = project.icon || 'target';
+      this.projectSelectedColor = project.color || '#FFD027';
+      this.updateProjectModalPickers();
 
-    if (this.backupBtn) {
-      this.backupBtn.addEventListener('click', () => {
-        const stats = window.LifeBackup.getStorageStats();
-        if (this.backupMemoryKb) this.backupMemoryKb.textContent = `${stats.kb} КБ`;
-        this.updateCloudStatusUI();
-        if (this.backupModal) this.backupModal.classList.add('active');
-      });
-    }
+      this.addProjectModal.classList.add('active');
+    });
 
-    if (this.closeBackupModalBtn) {
-      this.closeBackupModalBtn.addEventListener('click', () => {
-        if (this.backupModal) this.backupModal.classList.remove('active');
-      });
-    }
+    this.projectQuickTaskForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const title = this.projectQuickTaskInput.value.trim();
+      const pId = window.LifeState.activeProjectId;
 
-    if (this.loginYandexBtn) {
-      this.loginYandexBtn.addEventListener('click', () => {
-        window.LifeSync.startOAuthLogin();
-      });
-    }
+      if (title && pId) {
+        window.LifeState.addTask({ projectId: pId, title });
+        this.projectQuickTaskInput.value = '';
+        this.renderProjectTasks();
+        if (window.LifeSync) window.LifeSync.triggerAutoSync();
+      }
+    });
 
-    if (this.manualYandexTokenBtn) {
-      this.manualYandexTokenBtn.addEventListener('click', async () => {
-        const currentToken = localStorage.getItem('LIFE_OS_YANDEX_TOKEN') || '';
-        const token = await this.customPrompt(
-          'Вставьте ваш OAuth-токен Яндекс Диска (начинается на y0_...):',
-          currentToken,
-          'y0_AgAAAA...',
-          'Яндекс Диск'
-        );
+    this.addSphereBtn.addEventListener('click', () => {
+      this.editingSphereId = null;
+      this.sphereModalTitle.textContent = 'Новая сфера жизни';
+      this.sphereSubmitBtn.textContent = '+ Создать сферу';
+      document.getElementById('sphereTitleInput').value = '';
+      this.updateSphereModalPickers();
+      this.addSphereModal.classList.add('active');
+      document.getElementById('sphereTitleInput').focus();
+    });
+    this.closeModalBtn.addEventListener('click', () => this.addSphereModal.classList.remove('active'));
 
-        if (token) {
-          window.LifeSync.setYandexToken(token);
-          this.showToast('Проверяем токен...');
-          if (this.syncYandexNowBtn) this.syncYandexNowBtn.textContent = 'Синхронизация...';
-          window.LifeSync.syncWithYandexDisk((res) => {
-            if (this.syncYandexNowBtn) this.syncYandexNowBtn.textContent = 'Синхронизировать сейчас 🔄';
-            if (res.success) {
-              this.showToast('Яндекс Диск подключен!');
-              this.renderSpheres();
-              this.renderFocusTasks();
-              this.renderInbox();
-            } else {
-              this.customAlert(`Ошибка: ${res.error}`, 'Ошибка Яндекс Диска');
-            }
+    this.addProjectBtn.addEventListener('click', () => {
+      this.editingProjectId = null;
+      this.projectModalTitle.textContent = 'Новый проект';
+      this.projectSubmitBtn.textContent = '+ Создать блокнот проекта';
+      document.getElementById('projectTitleInput').value = '';
+      this.updateProjectModalPickers();
+      this.addProjectModal.classList.add('active');
+      setTimeout(() => document.getElementById('projectTitleInput').focus(), 100);
+    });
+    this.closeProjectModalBtn.addEventListener('click', () => this.addProjectModal.classList.remove('active'));
+
+    this.addProjectForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('projectTitleInput');
+      const title = input.value.trim();
+      const sphereId = window.LifeState.activeSphereId;
+
+      if (title) {
+        if (this.editingProjectId) {
+          window.LifeState.updateProject(this.editingProjectId, {
+            title: title,
+            icon: this.projectSelectedIcon,
+            color: this.projectSelectedColor
           });
+          this.showToast('Проект обновлен');
+          this.showProject(this.editingProjectId);
+        } else if (sphereId) {
+          window.LifeState.addProject({
+            sphereId: sphereId,
+            title: title,
+            icon: this.projectSelectedIcon,
+            color: this.projectSelectedColor
+          });
+          this.showToast('Проект создан');
+          this.renderSphereProjects();
         }
-      });
-    }
 
-    if (this.syncYandexNowBtn) {
-      this.syncYandexNowBtn.addEventListener('click', () => {
+        input.value = '';
+        this.addProjectModal.classList.remove('active');
+        if (window.LifeSync) window.LifeSync.triggerAutoSync();
+      }
+    });
+
+    this.inboxBtn.addEventListener('click', () => {
+      this.renderInbox();
+      this.inboxModal.classList.add('active');
+    });
+    this.closeInboxBtn.addEventListener('click', () => this.inboxModal.classList.remove('active'));
+
+    this.closeInboxTriageBtn.addEventListener('click', () => {
+      this.inboxTriageModal.classList.remove('active');
+    });
+
+    this.closeTaskDetailBtn.addEventListener('click', () => this.taskDetailModal.classList.remove('active'));
+    this.closeIosInstallBtn.addEventListener('click', () => this.iosInstallModal.classList.remove('active'));
+
+    this.backupBtn.addEventListener('click', () => {
+      const stats = window.LifeBackup.getStorageStats();
+      this.backupMemoryKb.textContent = `${stats.kb} КБ`;
+      this.updateCloudStatusUI();
+      this.backupModal.classList.add('active');
+    });
+
+    this.closeBackupModalBtn.addEventListener('click', () => {
+      this.backupModal.classList.remove('active');
+    });
+
+    this.loginYandexBtn.addEventListener('click', () => {
+      window.LifeSync.startOAuthLogin();
+    });
+
+    this.manualYandexTokenBtn.addEventListener('click', async () => {
+      const currentToken = localStorage.getItem('LIFE_OS_YANDEX_TOKEN') || '';
+      const token = await this.customPrompt(
+        'Вставьте ваш OAuth-токен Яндекс Диска (начинается на y0_...):',
+        currentToken,
+        'y0_AgAAAA...',
+        'Яндекс Диск'
+      );
+
+      if (token) {
+        window.LifeSync.setYandexToken(token);
+        this.showToast('Проверяем токен...');
         this.syncYandexNowBtn.textContent = 'Синхронизация...';
         window.LifeSync.syncWithYandexDisk((res) => {
-          if (this.syncYandexNowBtn) this.syncYandexNowBtn.textContent = 'Синхронизировать сейчас 🔄';
+          this.syncYandexNowBtn.textContent = 'Синхронизировать сейчас 🔄';
           if (res.success) {
-            this.showToast('Синхронизировано!');
+            this.showToast('Яндекс Диск подключен!');
             this.renderSpheres();
             this.renderFocusTasks();
             this.renderInbox();
           } else {
-            this.customAlert(`Ошибка: ${res.error}`, 'Ошибка');
+            this.customAlert(`Ошибка: ${res.error}`, 'Ошибка Яндекс Диска');
           }
         });
-      });
-    }
+      }
+    });
 
-    if (this.unlinkYandexBtn) {
-      this.unlinkYandexBtn.addEventListener('click', async () => {
-        const confirmed = await this.customConfirm('Отвязать Яндекс Диск от этого устройства?', 'Отключение синхронизации');
-        if (confirmed) {
-          window.LifeSync.unlinkYandex();
-          this.showToast('Яндекс Диск отключен');
+    this.syncYandexNowBtn.addEventListener('click', () => {
+      this.syncYandexNowBtn.textContent = 'Синхронизация...';
+      window.LifeSync.syncWithYandexDisk((res) => {
+        this.syncYandexNowBtn.textContent = 'Синхронизировать сейчас 🔄';
+        if (res.success) {
+          this.showToast('Синхронизировано!');
+          this.renderSpheres();
+          this.renderFocusTasks();
+          this.renderInbox();
+        } else {
+          this.customAlert(`Ошибка: ${res.error}`, 'Ошибка');
         }
       });
-    }
+    });
+
+    this.unlinkYandexBtn.addEventListener('click', async () => {
+      const confirmed = await this.customConfirm('Отвязать Яндекс Диск от этого устройства?', 'Отключение синхронизации');
+      if (confirmed) {
+        window.LifeSync.unlinkYandex();
+        this.showToast('Яндекс Диск отключен');
+      }
+    });
 
     const runDiagHandler = async () => {
       this.showToast('Запуск диагностики...');
@@ -1595,119 +1523,95 @@ window.LifeUI = {
     if (this.diagYandexBtn) this.diagYandexBtn.addEventListener('click', runDiagHandler);
     if (this.diagYandexConnectedBtn) this.diagYandexConnectedBtn.addEventListener('click', runDiagHandler);
 
-    if (this.downloadBackupBtn) {
-      this.downloadBackupBtn.addEventListener('click', () => {
-        const fileName = window.LifeBackup.exportData();
-        this.showToast(`Резервная копия скачана: ${fileName}`);
-      });
-    }
+    this.downloadBackupBtn.addEventListener('click', () => {
+      const fileName = window.LifeBackup.exportData();
+      this.showToast(`Резервная копия скачана: ${fileName}`);
+    });
 
-    if (this.modeMergeBtn) {
-      this.modeMergeBtn.addEventListener('click', () => {
-        this.currentImportMode = 'merge';
-        this.modeMergeBtn.classList.add('active');
-        if (this.modeOverwriteBtn) this.modeOverwriteBtn.classList.remove('active');
-      });
-    }
+    this.modeMergeBtn.addEventListener('click', () => {
+      this.currentImportMode = 'merge';
+      this.modeMergeBtn.classList.add('active');
+      this.modeOverwriteBtn.classList.remove('active');
+    });
 
-    if (this.modeOverwriteBtn) {
-      this.modeOverwriteBtn.addEventListener('click', () => {
-        this.currentImportMode = 'overwrite';
-        this.modeOverwriteBtn.classList.add('active');
-        if (this.modeMergeBtn) this.modeMergeBtn.classList.remove('active');
-      });
-    }
+    this.modeOverwriteBtn.addEventListener('click', () => {
+      this.currentImportMode = 'overwrite';
+      this.modeOverwriteBtn.classList.add('active');
+      this.modeMergeBtn.classList.remove('active');
+    });
 
-    if (this.fileDropZone) {
-      this.fileDropZone.addEventListener('click', () => {
-        if (this.backupFileInput) this.backupFileInput.click();
-      });
-    }
+    this.fileDropZone.addEventListener('click', () => {
+      this.backupFileInput.click();
+    });
 
-    if (this.backupFileInput) {
-      this.backupFileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    this.backupFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
 
-        const modeText = this.currentImportMode === 'merge' ? 'Умное слияние (без потерь)' : 'Полная перезапись';
-        const confirmed = await this.customConfirm(`Запустить восстановление файла в режиме «${modeText}»?`, 'Восстановление базы');
+      const modeText = this.currentImportMode === 'merge' ? 'Умное слияние (без потерь)' : 'Полная перезапись';
+      const confirmed = await this.customConfirm(`Запустить восстановление файла в режиме «${modeText}»?`, 'Восстановление базы');
 
-        if (confirmed) {
-          window.LifeBackup.importFromFile(file, this.currentImportMode, (res) => {
-            if (res.success) {
-              this.showToast(`Восстановлено! Задач: ${res.count}`);
-              if (this.backupModal) this.backupModal.classList.remove('active');
-              this.showDashboard();
-              this.renderInbox();
-              if (window.LifeSync) window.LifeSync.triggerAutoSync();
-            } else {
-              this.customAlert(`Ошибка: ${res.error}`, 'Сбой восстановления');
-            }
-            this.backupFileInput.value = '';
-          });
-        } else {
+      if (confirmed) {
+        window.LifeBackup.importFromFile(file, this.currentImportMode, (res) => {
+          if (res.success) {
+            this.showToast(`Восстановлено! Задач: ${res.count}`);
+            this.backupModal.classList.remove('active');
+            this.showDashboard();
+            this.renderInbox();
+            if (window.LifeSync) window.LifeSync.triggerAutoSync();
+          } else {
+            this.customAlert(`Ошибка: ${res.error}`, 'Сбой восстановления');
+          }
           this.backupFileInput.value = '';
-        }
-      });
-    }
+        });
+      } else {
+        this.backupFileInput.value = '';
+      }
+    });
 
-    if (this.resetAllDataBtn) {
-      this.resetAllDataBtn.addEventListener('click', async () => {
-        const confirmed = await this.customConfirm(
-          'Вы уверены, что хотите полностью стереть все данные? Все сферы, проекты, задачи и мысли в инбоксе будут удалены навсегда.',
-          'Полная очистка'
-        );
+    this.resetAllDataBtn.addEventListener('click', async () => {
+      const confirmed = await this.customConfirm(
+        'Вы уверены, что хотите полностью стереть все данные? Все сферы, проекты, задачи и мысли в инбоксе будут удалены навсегда.',
+        'Полная очистка'
+      );
 
-        if (confirmed) {
-          window.LifeState.resetAll();
-          if (this.backupModal) this.backupModal.classList.remove('active');
-          this.showDashboard();
-          this.renderInbox();
-          this.showToast('База полностью очищена');
-          if (window.LifeSync) window.LifeSync.triggerAutoSync();
-        }
-      });
-    }
+      if (confirmed) {
+        window.LifeState.resetAll();
+        this.backupModal.classList.remove('active');
+        this.showDashboard();
+        this.renderInbox();
+        this.showToast('База полностью очищена');
+        if (window.LifeSync) window.LifeSync.triggerAutoSync();
+      }
+    });
 
-    if (this.propBtnDeadline) {
-      this.propBtnDeadline.addEventListener('click', () => {
-        this.propBoxDeadline.style.display = 'flex';
-        this.detailTaskDeadline.focus();
-      });
-    }
-    if (this.removeDeadlineBtn) {
-      this.removeDeadlineBtn.addEventListener('click', () => {
-        this.propBoxDeadline.style.display = 'none';
-        this.detailTaskDeadline.value = '';
-      });
-    }
+    this.propBtnDeadline.addEventListener('click', () => {
+      this.propBoxDeadline.style.display = 'flex';
+      this.detailTaskDeadline.focus();
+    });
+    this.removeDeadlineBtn.addEventListener('click', () => {
+      this.propBoxDeadline.style.display = 'none';
+      this.detailTaskDeadline.value = '';
+    });
 
-    if (this.propBtnChecklist) {
-      this.propBtnChecklist.addEventListener('click', () => {
-        this.propBoxChecklist.style.display = 'flex';
-        this.newSubtaskInput.focus();
-      });
-    }
-    if (this.removeChecklistBtn) {
-      this.removeChecklistBtn.addEventListener('click', () => {
-        this.propBoxChecklist.style.display = 'none';
-        this.currentEditingChecklist = [];
-        this.detailChecklistItems.innerHTML = '';
-      });
-    }
+    this.propBtnChecklist.addEventListener('click', () => {
+      this.propBoxChecklist.style.display = 'flex';
+      this.newSubtaskInput.focus();
+    });
+    this.removeChecklistBtn.addEventListener('click', () => {
+      this.propBoxChecklist.style.display = 'none';
+      this.currentEditingChecklist = [];
+      this.detailChecklistItems.innerHTML = '';
+    });
 
-    if (this.propBtnNote) {
-      this.propBtnNote.addEventListener('click', () => {
-        this.propBoxNote.style.display = 'flex';
-        this.detailTaskNote.focus();
-      });
-    }
-    if (this.removeNoteBtn) {
-      this.removeNoteBtn.addEventListener('click', () => {
-        this.propBoxNote.style.display = 'none';
-        this.detailTaskNote.value = '';
-      });
-    }
+    this.propBtnNote.addEventListener('click', () => {
+      this.propBoxNote.style.display = 'flex';
+      this.detailTaskNote.focus();
+    });
+    this.removeNoteBtn.addEventListener('click', () => {
+      this.propBoxNote.style.display = 'none';
+      this.detailTaskNote.value = '';
+    });
 
     const addSubtask = () => {
       const text = this.newSubtaskInput.value.trim();
@@ -1717,154 +1621,115 @@ window.LifeUI = {
         this.renderChecklistItems();
       }
     };
-    if (this.addSubtaskBtn) this.addSubtaskBtn.addEventListener('click', addSubtask);
-    if (this.newSubtaskInput) {
-      this.newSubtaskInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          addSubtask();
-        }
-      });
-    }
-
-    if (this.taskDetailForm) {
-      this.taskDetailForm.addEventListener('submit', (e) => {
+    this.addSubtaskBtn.addEventListener('click', addSubtask);
+    this.newSubtaskInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
         e.preventDefault();
-        const taskId = this.detailTaskId.value;
-        const title = this.detailTaskTitle.value.trim();
-        const deadline = this.propBoxDeadline.style.display !== 'none' ? this.detailTaskDeadline.value : null;
-        const note = this.propBoxNote.style.display !== 'none' ? this.detailTaskNote.value.trim() : '';
-        const checklist = this.propBoxChecklist.style.display !== 'none' ? this.currentEditingChecklist : [];
+        addSubtask();
+      }
+    });
 
-        if (taskId && title) {
-          window.LifeState.updateTask(taskId, { title, deadline, note, checklist });
-          if (this.taskDetailModal) this.taskDetailModal.classList.remove('active');
+    this.taskDetailForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const taskId = this.detailTaskId.value;
+      const title = this.detailTaskTitle.value.trim();
+      const deadline = this.propBoxDeadline.style.display !== 'none' ? this.detailTaskDeadline.value : null;
+      const note = this.propBoxNote.style.display !== 'none' ? this.detailTaskNote.value.trim() : '';
+      const checklist = this.propBoxChecklist.style.display !== 'none' ? this.currentEditingChecklist : [];
+
+      if (taskId && title) {
+        window.LifeState.updateTask(taskId, { title, deadline, note, checklist });
+        this.taskDetailModal.classList.remove('active');
+        if (window.LifeState.activeProjectId) this.renderProjectTasks();
+        this.renderFocusTasks();
+        this.showToast('Задача обновлена');
+        if (window.LifeSync) window.LifeSync.triggerAutoSync();
+      }
+    });
+
+    this.deleteTaskBtn.addEventListener('click', async () => {
+      const taskId = this.detailTaskId.value;
+      if (taskId) {
+        const confirmed = await this.customConfirm('Удалить эту задачу навсегда?', 'Удаление задачи');
+        if (confirmed) {
+          window.LifeState.deleteTask(taskId);
+          this.taskDetailModal.classList.remove('active');
           if (window.LifeState.activeProjectId) this.renderProjectTasks();
           this.renderFocusTasks();
-          this.showToast('Задача обновлена');
+          this.showToast('Задача удалена');
           if (window.LifeSync) window.LifeSync.triggerAutoSync();
         }
-      });
-    }
+      }
+    });
 
-    if (this.deleteTaskBtn) {
-      this.deleteTaskBtn.addEventListener('click', async () => {
-        const taskId = this.detailTaskId.value;
-        if (taskId) {
-          const confirmed = await this.customConfirm('Удалить эту задачу навсегда?', 'Удаление задачи');
-          if (confirmed) {
-            window.LifeState.deleteTask(taskId);
-            if (this.taskDetailModal) this.taskDetailModal.classList.remove('active');
-            if (window.LifeState.activeProjectId) this.renderProjectTasks();
-            this.renderFocusTasks();
-            this.showToast('Задача удалена');
-            if (window.LifeSync) window.LifeSync.triggerAutoSync();
-          }
-        }
-      });
-    }
+    this.customDialogConfirmBtn.addEventListener('click', () => this.closeCustomDialog(true));
+    this.customDialogCancelBtn.addEventListener('click', () => this.closeCustomDialog(false));
+    this.customDialogCloseBtn.addEventListener('click', () => this.closeCustomDialog(false));
 
-    if (this.customDialogConfirmBtn) {
-      this.customDialogConfirmBtn.addEventListener('click', () => this.closeCustomDialog(true));
-    }
-    if (this.customDialogCancelBtn) {
-      this.customDialogCancelBtn.addEventListener('click', () => this.closeCustomDialog(false));
-    }
-    if (this.customDialogCloseBtn) {
-      this.customDialogCloseBtn.addEventListener('click', () => this.closeCustomDialog(false));
-    }
-
-    // Закрытие ЛЮБОЙ модалки по клику на фон
-    const allOverlays = [
-      this.addSphereModal, this.inboxModal, this.addProjectModal,
-      this.taskDetailModal, this.iosInstallModal, this.backupModal,
-      this.inboxTriageModal, this.customDialogModal
-    ];
-
-    allOverlays.forEach(overlay => {
+    [this.addSphereModal, this.inboxModal, this.addProjectModal, this.taskDetailModal, this.iosInstallModal, this.backupModal, this.inboxTriageModal].forEach(overlay => {
       if (overlay) {
         overlay.addEventListener('click', (e) => {
-          if (e.target === overlay) {
-            overlay.classList.remove('active');
-            if (overlay === this.customDialogModal && this.activeDialogResolver) {
-              this.activeDialogResolver(false);
-              this.activeDialogResolver = null;
-            }
-          }
+          if (e.target === overlay) overlay.classList.remove('active');
         });
       }
     });
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        allOverlays.forEach(m => {
+        [this.addSphereModal, this.inboxModal, this.addProjectModal, this.taskDetailModal, this.iosInstallModal, this.backupModal, this.customDialogModal, this.inboxTriageModal].forEach(m => {
           if (m) m.classList.remove('active');
         });
-        if (this.activeDialogResolver) {
-          this.activeDialogResolver(false);
-          this.activeDialogResolver = null;
-        }
       }
     });
 
-    if (this.sphereForm) {
-      this.sphereForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const input = document.getElementById('sphereTitleInput');
-        const title = input.value.trim();
-        if (!title) return;
+    this.sphereForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('sphereTitleInput');
+      const title = input.value.trim();
+      if (!title) return;
 
-        if (this.editingSphereId) {
-          window.LifeState.updateSphere(this.editingSphereId, {
-            title,
-            icon: this.sphereSelectedIcon,
-            color: this.sphereSelectedColor
-          });
-          this.showToast('Сфера обновлена');
-          this.showSphere(this.editingSphereId);
-        } else {
-          window.LifeState.addSphere({
-            title,
-            icon: this.sphereSelectedIcon,
-            color: this.sphereSelectedColor
-          });
-          this.showToast('Сфера создана');
-          this.renderSpheres();
-        }
+      if (this.editingSphereId) {
+        window.LifeState.updateSphere(this.editingSphereId, {
+          title,
+          icon: this.sphereSelectedIcon,
+          color: this.sphereSelectedColor
+        });
+        this.showToast('Сфера обновлена');
+        this.showSphere(this.editingSphereId);
+      } else {
+        window.LifeState.addSphere({
+          title,
+          icon: this.sphereSelectedIcon,
+          color: this.sphereSelectedColor
+        });
+        this.showToast('Сфера создана');
+        this.renderSpheres();
+      }
 
-        if (this.addSphereModal) this.addSphereModal.classList.remove('active');
-        input.value = '';
-        if (window.LifeSync) window.LifeSync.triggerAutoSync();
-      });
-    }
+      this.addSphereModal.classList.remove('active');
+      input.value = '';
+      if (window.LifeSync) window.LifeSync.triggerAutoSync();
+    });
 
-    if (this.inboxForm) {
-      this.inboxForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const text = this.inboxInput.value.trim();
-        if (!text) return;
+    this.inboxForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = this.inboxInput.value.trim();
+      if (!text) return;
 
-        window.LifeState.addInboxThought(text);
-        this.inboxInput.value = '';
-        this.renderInbox();
-        this.showToast('Мысль записана в Инбокс');
-        if (window.LifeSync) window.LifeSync.triggerAutoSync();
-      });
-    }
+      window.LifeState.addInboxThought(text);
+      this.inboxInput.value = '';
+      this.renderInbox();
+      this.showToast('Мысль записана в Инбокс');
+      if (window.LifeSync) window.LifeSync.triggerAutoSync();
+    });
   },
 
   updateSphereModalPickers() {
     const sPrevBadge = document.getElementById('spherePreviewBadge');
     const sPrevTitle = document.getElementById('spherePreviewTitle');
-    const titleInput = document.getElementById('sphereTitleInput');
-
-    if (sPrevBadge && window.LifeIcons) {
-      sPrevBadge.innerHTML = window.LifeIcons.get(this.sphereSelectedIcon || 'folder');
-      sPrevBadge.style.backgroundColor = this.safeColor(this.sphereSelectedColor);
-    }
-    if (sPrevTitle) {
-      sPrevTitle.textContent = (titleInput && titleInput.value.trim()) || 'Название сферы';
-    }
+    sPrevBadge.innerHTML = window.LifeIcons.get(this.sphereSelectedIcon);
+    sPrevBadge.style.backgroundColor = this.safeColor(this.sphereSelectedColor);
+    sPrevTitle.textContent = document.getElementById('sphereTitleInput').value.trim() || 'Название сферы';
 
     document.querySelectorAll('#sphereIconPickerGrid .icon-choice-btn').forEach(btn => {
       btn.classList.toggle('selected', btn.getAttribute('data-s-icon') === this.sphereSelectedIcon);
@@ -1877,15 +1742,9 @@ window.LifeUI = {
   updateProjectModalPickers() {
     const pPrevBadge = document.getElementById('projectPreviewBadge');
     const pPrevTitle = document.getElementById('projectPreviewTitle');
-    const titleInput = document.getElementById('projectTitleInput');
-
-    if (pPrevBadge && window.LifeIcons) {
-      pPrevBadge.innerHTML = window.LifeIcons.get(this.projectSelectedIcon || 'target');
-      pPrevBadge.style.backgroundColor = this.safeColor(this.projectSelectedColor);
-    }
-    if (pPrevTitle) {
-      pPrevTitle.textContent = (titleInput && titleInput.value.trim()) || 'Название проекта';
-    }
+    pPrevBadge.innerHTML = window.LifeIcons.get(this.projectSelectedIcon);
+    pPrevBadge.style.backgroundColor = this.safeColor(this.projectSelectedColor);
+    pPrevTitle.textContent = document.getElementById('projectTitleInput').value.trim() || 'Название проекта';
 
     document.querySelectorAll('#projectIconPickerGrid .icon-choice-btn').forEach(btn => {
       btn.classList.toggle('selected', btn.getAttribute('data-p-icon') === this.projectSelectedIcon);
@@ -1903,94 +1762,76 @@ window.LifeUI = {
     const sPrevBadge = document.getElementById('spherePreviewBadge');
     const sPrevTitle = document.getElementById('spherePreviewTitle');
 
-    if (sIconBox) {
-      sIconBox.innerHTML = iconKeys.map(k => `
-        <button type="button" class="icon-choice-btn ${k === this.sphereSelectedIcon ? 'selected' : ''}" data-s-icon="${k}">${window.LifeIcons.get(k)}</button>
-      `).join('');
+    sIconBox.innerHTML = iconKeys.map(k => `
+      <button type="button" class="icon-choice-btn ${k === this.sphereSelectedIcon ? 'selected' : ''}" data-s-icon="${k}">${window.LifeIcons.get(k)}</button>
+    `).join('');
 
-      sIconBox.querySelectorAll('[data-s-icon]').forEach(b => {
-        b.addEventListener('click', () => {
-          sIconBox.querySelectorAll('.icon-choice-btn').forEach(btn => btn.classList.remove('selected'));
-          b.classList.add('selected');
-          this.sphereSelectedIcon = b.getAttribute('data-s-icon');
-          if (sPrevBadge) sPrevBadge.innerHTML = window.LifeIcons.get(this.sphereSelectedIcon);
-        });
+    sColorBox.innerHTML = this.palette.map(c => `
+      <button type="button" class="color-choice-btn ${c === this.sphereSelectedColor ? 'selected' : ''}" data-s-color="${c}" style="background-color: ${c};"></button>
+    `).join('');
+
+    sPrevBadge.innerHTML = window.LifeIcons.get(this.sphereSelectedIcon);
+    sPrevBadge.style.backgroundColor = this.safeColor(this.sphereSelectedColor);
+
+    document.getElementById('sphereTitleInput').addEventListener('input', e => {
+      sPrevTitle.textContent = e.target.value.trim() || 'Название сферы';
+    });
+
+    sIconBox.querySelectorAll('[data-s-icon]').forEach(b => {
+      b.addEventListener('click', () => {
+        sIconBox.querySelectorAll('.icon-choice-btn').forEach(btn => btn.classList.remove('selected'));
+        b.classList.add('selected');
+        this.sphereSelectedIcon = b.getAttribute('data-s-icon');
+        sPrevBadge.innerHTML = window.LifeIcons.get(this.sphereSelectedIcon);
       });
-    }
+    });
 
-    if (sColorBox) {
-      sColorBox.innerHTML = this.palette.map(c => `
-        <button type="button" class="color-choice-btn ${c === this.sphereSelectedColor ? 'selected' : ''}" data-s-color="${c}" style="background-color: ${c};"></button>
-      `).join('');
-
-      sColorBox.querySelectorAll('[data-s-color]').forEach(b => {
-        b.addEventListener('click', () => {
-          sColorBox.querySelectorAll('.color-choice-btn').forEach(btn => btn.classList.remove('selected'));
-          b.classList.add('selected');
-          this.sphereSelectedColor = b.getAttribute('data-s-color');
-          if (sPrevBadge) sPrevBadge.style.backgroundColor = this.safeColor(this.sphereSelectedColor);
-        });
+    sColorBox.querySelectorAll('[data-s-color]').forEach(b => {
+      b.addEventListener('click', () => {
+        sColorBox.querySelectorAll('.color-choice-btn').forEach(btn => btn.classList.remove('selected'));
+        b.classList.add('selected');
+        this.sphereSelectedColor = b.getAttribute('data-s-color');
+        sPrevBadge.style.backgroundColor = this.safeColor(this.sphereSelectedColor);
       });
-    }
-
-    if (sPrevBadge) {
-      sPrevBadge.innerHTML = window.LifeIcons.get(this.sphereSelectedIcon);
-      sPrevBadge.style.backgroundColor = this.safeColor(this.sphereSelectedColor);
-    }
-
-    const sphereInput = document.getElementById('sphereTitleInput');
-    if (sphereInput && sPrevTitle) {
-      sphereInput.addEventListener('input', e => {
-        sPrevTitle.textContent = e.target.value.trim() || 'Название сферы';
-      });
-    }
+    });
 
     const pIconBox = document.getElementById('projectIconPickerGrid');
     const pColorBox = document.getElementById('projectColorPickerGrid');
     const pPrevBadge = document.getElementById('projectPreviewBadge');
     const pPrevTitle = document.getElementById('projectPreviewTitle');
 
-    if (pIconBox) {
-      pIconBox.innerHTML = iconKeys.map(k => `
-        <button type="button" class="icon-choice-btn ${k === this.projectSelectedIcon ? 'selected' : ''}" data-p-icon="${k}">${window.LifeIcons.get(k)}</button>
-      `).join('');
+    pIconBox.innerHTML = iconKeys.map(k => `
+      <button type="button" class="icon-choice-btn ${k === this.projectSelectedIcon ? 'selected' : ''}" data-p-icon="${k}">${window.LifeIcons.get(k)}</button>
+    `).join('');
 
-      pIconBox.querySelectorAll('[data-p-icon]').forEach(b => {
-        b.addEventListener('click', () => {
-          pIconBox.querySelectorAll('.icon-choice-btn').forEach(btn => btn.classList.remove('selected'));
-          b.classList.add('selected');
-          this.projectSelectedIcon = b.getAttribute('data-p-icon');
-          if (pPrevBadge) pPrevBadge.innerHTML = window.LifeIcons.get(this.projectSelectedIcon);
-        });
+    pColorBox.innerHTML = this.palette.map(c => `
+      <button type="button" class="color-choice-btn ${c === this.projectSelectedColor ? 'selected' : ''}" data-p-color="${c}" style="background-color: ${c};"></button>
+    `).join('');
+
+    pPrevBadge.innerHTML = window.LifeIcons.get(this.projectSelectedIcon);
+    pPrevBadge.style.backgroundColor = this.safeColor(this.projectSelectedColor);
+
+    document.getElementById('projectTitleInput').addEventListener('input', e => {
+      pPrevTitle.textContent = e.target.value.trim() || 'Название проекта';
+    });
+
+    pIconBox.querySelectorAll('[data-p-icon]').forEach(b => {
+      b.addEventListener('click', () => {
+        pIconBox.querySelectorAll('.icon-choice-btn').forEach(btn => btn.classList.remove('selected'));
+        b.classList.add('selected');
+        this.projectSelectedIcon = b.getAttribute('data-p-icon');
+        pPrevBadge.innerHTML = window.LifeIcons.get(this.projectSelectedIcon);
       });
-    }
+    });
 
-    if (pColorBox) {
-      pColorBox.innerHTML = this.palette.map(c => `
-        <button type="button" class="color-choice-btn ${c === this.projectSelectedColor ? 'selected' : ''}" data-p-color="${c}" style="background-color: ${c};"></button>
-      `).join('');
-
-      pColorBox.querySelectorAll('[data-p-color]').forEach(b => {
-        b.addEventListener('click', () => {
-          pColorBox.querySelectorAll('.color-choice-btn').forEach(btn => btn.classList.remove('selected'));
-          b.classList.add('selected');
-          this.projectSelectedColor = b.getAttribute('data-p-color');
-          if (pPrevBadge) pPrevBadge.style.backgroundColor = this.safeColor(this.projectSelectedColor);
-        });
+    pColorBox.querySelectorAll('[data-p-color]').forEach(b => {
+      b.addEventListener('click', () => {
+        pColorBox.querySelectorAll('.color-choice-btn').forEach(btn => btn.classList.remove('selected'));
+        b.classList.add('selected');
+        this.projectSelectedColor = b.getAttribute('data-p-color');
+        pPrevBadge.style.backgroundColor = this.safeColor(this.projectSelectedColor);
       });
-    }
-
-    if (pPrevBadge) {
-      pPrevBadge.innerHTML = window.LifeIcons.get(this.projectSelectedIcon);
-      pPrevBadge.style.backgroundColor = this.safeColor(this.projectSelectedColor);
-    }
-
-    const projectInput = document.getElementById('projectTitleInput');
-    if (projectInput && pPrevTitle) {
-      projectInput.addEventListener('input', e => {
-        pPrevTitle.textContent = e.target.value.trim() || 'Название проекта';
-      });
-    }
+    });
   },
 
   formatDate(dateStr) {

@@ -12,6 +12,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // 3. Подключение кнопки установки PWA
   initPwaInstall();
 
+  // Отлов скрытых ошибок (чтобы сайт не зависал молча)
+  window.addEventListener('error', () => {
+    if (window.LifeUI && window.LifeUI.showToast) {
+      window.LifeUI.showToast('Что-то пошло не так. Пожалуйста, перезагрузите страницу.', 'error');
+    }
+  });
+
   // 4. ПРОВЕРКА ВОЗВРАТА ИЗ ЯНДЕКС ID (ВХОД В 1 КЛИК)
   if (window.LifeSync) {
     const isTokenCaptured = window.LifeSync.checkUrlToken();

@@ -296,7 +296,15 @@ window.LifeSync = {
       } else {
         const downMeta = await downMetaRes.json();
         // 2. Скачивание файла через личный шлюз
-        remoteData = await this.downloadFile(downMeta.href);
+        let rawDownload = await this.downloadFile(downMeta.href);
+        
+        // Если структура файла обернута (как при ручном бэкапе)
+        if (rawDownload && rawDownload.data) {
+          rawDownload = rawDownload.data;
+        }
+        
+        // Прогоняем через фильтр, чтобы сломанный файл не "убил" систему
+        remoteData = window.LifeBackup.sanitizeData(rawDownload);
       }
 
       // 3. Слияние данных

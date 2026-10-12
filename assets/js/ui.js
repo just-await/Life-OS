@@ -131,10 +131,10 @@ window.LifeUI = {
   autoScrollRaf: null,
   autoScrollVelocity: 0,
 
-  palette: [
-    '#FFD027', '#B4E816', '#20C968', '#00C9B7', '#09B5EB', '#3875FF',
-    '#635BFF', '#9B51E0', '#EB2F96', '#FF5CA8', '#FF3B30', '#FF6B4A',
-    '#FF8A00', '#E09F3E', '#C8A27A', '#388E3C', '#842A5E', '#8C9BAE'
+palette: [
+    '#FF3B30', '#FF6B4A', '#FF8A00', '#FFA726', '#FFD027', '#F4D03F',
+    '#B4E816', '#20C968', '#00C9B7', '#48C9B0', '#09B5EB', '#3875FF',
+    '#635BFF', '#9B51E0', '#EB2F96', '#FF5CA8', '#C8A27A', '#8C9BAE'
   ],
 
   init() {
@@ -447,7 +447,7 @@ window.LifeUI = {
       this.customDialogCancelBtn.style.display = 'inline-flex';
       this.customDialogConfirmBtn.textContent = 'Сохранить';
 
-      setTimeout(() => this.customDialogInput.focus(), 100);
+      this.customDialogInput.focus();
 
       this.activeDialogResolver = (confirmed) => {
         resolve(confirmed ? this.customDialogInput.value.trim() : null);
@@ -713,9 +713,14 @@ window.LifeUI = {
         const taskId = e.target.id.replace('pjchk-', '');
         const updated = window.LifeState.toggleTaskCompleted(taskId);
 
-        if (updated && updated.completed && window.LifeConfetti) {
-          const rect = e.target.getBoundingClientRect();
-          window.LifeConfetti.shoot(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        if (updated && updated.completed) {
+          if (navigator.vibrate) navigator.vibrate(40);
+          if (window.LifeConfetti) {
+            const rect = e.target.getBoundingClientRect();
+            window.LifeConfetti.shoot(rect.left + rect.width / 2, rect.top + rect.height / 2);
+          }
+        } else if (updated && !updated.completed) {
+          if (navigator.vibrate) navigator.vibrate(20);
         }
 
         this.renderProjectTasks();
@@ -890,9 +895,14 @@ window.LifeUI = {
         const taskId = e.target.id.replace('chk-', '');
         const updatedTask = window.LifeState.toggleTaskCompleted(taskId);
 
-        if (updatedTask && updatedTask.completed && window.LifeConfetti) {
-          const rect = e.target.getBoundingClientRect();
-          window.LifeConfetti.shoot(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        if (updatedTask && updatedTask.completed) {
+          if (navigator.vibrate) navigator.vibrate(40); // Тактильный щелчок
+          if (window.LifeConfetti) {
+            const rect = e.target.getBoundingClientRect();
+            window.LifeConfetti.shoot(rect.left + rect.width / 2, rect.top + rect.height / 2);
+          }
+        } else if (updatedTask && !updatedTask.completed) {
+          if (navigator.vibrate) navigator.vibrate(20); // Легкий отклик при снятии галочки
         }
 
         this.renderFocusTasks();
@@ -1725,12 +1735,6 @@ window.LifeUI = {
   },
 
   updateSphereModalPickers() {
-    const sPrevBadge = document.getElementById('spherePreviewBadge');
-    const sPrevTitle = document.getElementById('spherePreviewTitle');
-    sPrevBadge.innerHTML = window.LifeIcons.get(this.sphereSelectedIcon);
-    sPrevBadge.style.backgroundColor = this.safeColor(this.sphereSelectedColor);
-    sPrevTitle.textContent = document.getElementById('sphereTitleInput').value.trim() || 'Название сферы';
-
     document.querySelectorAll('#sphereIconPickerGrid .icon-choice-btn').forEach(btn => {
       btn.classList.toggle('selected', btn.getAttribute('data-s-icon') === this.sphereSelectedIcon);
     });
@@ -1740,12 +1744,6 @@ window.LifeUI = {
   },
 
   updateProjectModalPickers() {
-    const pPrevBadge = document.getElementById('projectPreviewBadge');
-    const pPrevTitle = document.getElementById('projectPreviewTitle');
-    pPrevBadge.innerHTML = window.LifeIcons.get(this.projectSelectedIcon);
-    pPrevBadge.style.backgroundColor = this.safeColor(this.projectSelectedColor);
-    pPrevTitle.textContent = document.getElementById('projectTitleInput').value.trim() || 'Название проекта';
-
     document.querySelectorAll('#projectIconPickerGrid .icon-choice-btn').forEach(btn => {
       btn.classList.toggle('selected', btn.getAttribute('data-p-icon') === this.projectSelectedIcon);
     });
@@ -1757,10 +1755,9 @@ window.LifeUI = {
   renderModalPickers() {
     const iconKeys = Object.keys(window.LifeIcons.list);
 
+    // Сфера
     const sIconBox = document.getElementById('sphereIconPickerGrid');
     const sColorBox = document.getElementById('sphereColorPickerGrid');
-    const sPrevBadge = document.getElementById('spherePreviewBadge');
-    const sPrevTitle = document.getElementById('spherePreviewTitle');
 
     sIconBox.innerHTML = iconKeys.map(k => `
       <button type="button" class="icon-choice-btn ${k === this.sphereSelectedIcon ? 'selected' : ''}" data-s-icon="${k}">${window.LifeIcons.get(k)}</button>
@@ -1770,19 +1767,11 @@ window.LifeUI = {
       <button type="button" class="color-choice-btn ${c === this.sphereSelectedColor ? 'selected' : ''}" data-s-color="${c}" style="background-color: ${c};"></button>
     `).join('');
 
-    sPrevBadge.innerHTML = window.LifeIcons.get(this.sphereSelectedIcon);
-    sPrevBadge.style.backgroundColor = this.safeColor(this.sphereSelectedColor);
-
-    document.getElementById('sphereTitleInput').addEventListener('input', e => {
-      sPrevTitle.textContent = e.target.value.trim() || 'Название сферы';
-    });
-
     sIconBox.querySelectorAll('[data-s-icon]').forEach(b => {
       b.addEventListener('click', () => {
         sIconBox.querySelectorAll('.icon-choice-btn').forEach(btn => btn.classList.remove('selected'));
         b.classList.add('selected');
         this.sphereSelectedIcon = b.getAttribute('data-s-icon');
-        sPrevBadge.innerHTML = window.LifeIcons.get(this.sphereSelectedIcon);
       });
     });
 
@@ -1791,14 +1780,12 @@ window.LifeUI = {
         sColorBox.querySelectorAll('.color-choice-btn').forEach(btn => btn.classList.remove('selected'));
         b.classList.add('selected');
         this.sphereSelectedColor = b.getAttribute('data-s-color');
-        sPrevBadge.style.backgroundColor = this.safeColor(this.sphereSelectedColor);
       });
     });
 
+    // Проект
     const pIconBox = document.getElementById('projectIconPickerGrid');
     const pColorBox = document.getElementById('projectColorPickerGrid');
-    const pPrevBadge = document.getElementById('projectPreviewBadge');
-    const pPrevTitle = document.getElementById('projectPreviewTitle');
 
     pIconBox.innerHTML = iconKeys.map(k => `
       <button type="button" class="icon-choice-btn ${k === this.projectSelectedIcon ? 'selected' : ''}" data-p-icon="${k}">${window.LifeIcons.get(k)}</button>
@@ -1808,19 +1795,11 @@ window.LifeUI = {
       <button type="button" class="color-choice-btn ${c === this.projectSelectedColor ? 'selected' : ''}" data-p-color="${c}" style="background-color: ${c};"></button>
     `).join('');
 
-    pPrevBadge.innerHTML = window.LifeIcons.get(this.projectSelectedIcon);
-    pPrevBadge.style.backgroundColor = this.safeColor(this.projectSelectedColor);
-
-    document.getElementById('projectTitleInput').addEventListener('input', e => {
-      pPrevTitle.textContent = e.target.value.trim() || 'Название проекта';
-    });
-
     pIconBox.querySelectorAll('[data-p-icon]').forEach(b => {
       b.addEventListener('click', () => {
         pIconBox.querySelectorAll('.icon-choice-btn').forEach(btn => btn.classList.remove('selected'));
         b.classList.add('selected');
         this.projectSelectedIcon = b.getAttribute('data-p-icon');
-        pPrevBadge.innerHTML = window.LifeIcons.get(this.projectSelectedIcon);
       });
     });
 
@@ -1829,9 +1808,16 @@ window.LifeUI = {
         pColorBox.querySelectorAll('.color-choice-btn').forEach(btn => btn.classList.remove('selected'));
         b.classList.add('selected');
         this.projectSelectedColor = b.getAttribute('data-p-color');
-        pPrevBadge.style.backgroundColor = this.safeColor(this.projectSelectedColor);
       });
     });
+    
+    // Авто-расширение поля заметки при вводе текста
+    if (this.detailTaskNote) {
+      this.detailTaskNote.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+      });
+    }
   },
 
   formatDate(dateStr) {

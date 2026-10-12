@@ -56,8 +56,8 @@
         <button class="neo-btn" id="inboxBtn" aria-label="Открыть инбокс">
           📥 Инбокс <span class="badge" id="inboxBadge" style="display: none;">0</span>
         </button>
-        <button class="neo-btn neo-btn-primary" id="backupBtn" title="Резервная копия и синхронизация">
-          💾 Бэкап <span class="sync-dot sync-dot-none" id="headerSyncDot"></span>
+        <button class="neo-btn neo-btn-primary" id="backupBtn" title="Меню и настройки">
+          ⚙️ Меню <span class="sync-dot sync-dot-none" id="headerSyncDot"></span>
         </button>
       </div>
     </header>
@@ -197,10 +197,20 @@
     <div class="modal-card">
       <div class="modal-header">
         <div>
-          <h2 class="modal-title" id="backupModalHeading">💾 Центр данных и Облако</h2>
-          <p style="font-size: 0.8rem; color: var(--ink-muted); margin-top: 2px;">Local-First: независимость и приватность.</p>
+          <h2 class="modal-title" id="backupModalHeading">⚙️ Настройки и Данные</h2>
+          <p style="font-size: 0.8rem; color: var(--ink-muted); margin-top: 2px;">Ваш персональный центр управления.</p>
         </div>
         <button class="modal-close-btn" id="closeBackupModalBtn" aria-label="Закрыть">✕</button>
+      </div>
+
+      <!-- Блок Доната (Скрытая и эстетичная поддержка) -->
+      <div class="donation-card">
+        <div class="donation-text">
+          <h3>Угостить автора кофе ☕</h3>
+          <p>Life OS бесплатна и не следит за вами. Если планер помогает вам, вы можете символически поддержать проект.</p>
+        </div>
+        <!-- Сюда потом вставишь ссылку вместо # -->
+        <a href="#" target="_blank" class="neo-btn neo-btn-sm" style="flex-shrink: 0; text-decoration: none;">Поддержать</a>
       </div>
 
       <div class="backup-stats-pill">
@@ -338,15 +348,7 @@
           <div class="color-picker-grid" id="sphereColorPickerGrid"></div>
         </div>
 
-        <div class="form-group" style="margin-top: 14px;">
-          <label class="form-label">Превью</label>
-          <div class="preview-box">
-            <div class="preview-badge" id="spherePreviewBadge"></div>
-            <span class="preview-title" id="spherePreviewTitle">Название сферы</span>
-          </div>
-        </div>
-
-        <button type="submit" class="neo-btn neo-btn-primary" id="sphereSubmitBtn" style="width: 100%; margin-top: 20px;">
+        <button type="submit" class="neo-btn neo-btn-primary" id="sphereSubmitBtn" style="width: 100%; margin-top: 24px;">
           + Создать сферу
         </button>
       </form>
@@ -375,14 +377,6 @@
         <div class="form-group" style="margin-top: 14px;">
           <label class="form-label">Цвет блокнота</label>
           <div class="color-picker-grid" id="projectColorPickerGrid"></div>
-        </div>
-
-        <div class="form-group" style="margin-top: 14px;">
-          <label class="form-label">Превью карточки</label>
-          <div class="preview-box">
-            <div class="preview-badge" id="projectPreviewBadge"></div>
-            <span class="preview-title" id="projectPreviewTitle">Название проекта</span>
-          </div>
         </div>
 
         <button type="submit" class="neo-btn neo-btn-primary" id="projectSubmitBtn" style="width: 100%; margin-top: 20px;">

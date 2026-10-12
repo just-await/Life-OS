@@ -596,3 +596,39 @@
   transform: translate(1px, 1px);
   box-shadow: 1px 1px 0 var(--shadow-color);
 }
+
+/* Умное текстовое поле (заметки) */
+textarea.neo-input {
+  resize: none;
+  overflow-y: hidden;
+  line-height: 1.4;
+}
+
+/* Эстетичная карточка доната */
+.donation-card {
+  background-color: var(--bg-beige);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 2px 2px 0 var(--shadow-color);
+  margin-bottom: 2px;
+}
+[data-theme="dark"] .donation-card {
+  background-color: #3D2B24;
+  color: var(--ink-black);
+}
+.donation-text h3 {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.donation-text p {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--ink-muted);
+}

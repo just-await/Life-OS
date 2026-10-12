@@ -141,6 +141,25 @@ palette: [
     this.cacheDom();
     this.initTheme();
     if (window.LifeSync) window.LifeSync.init();
+
+    // Роутинг: перехват физической кнопки "Назад" на телефонах
+    history.replaceState({ view: 'dashboard' }, '');
+    window.addEventListener('popstate', (e) => {
+      // Если открыта любая модалка (окно) - просто закрываем её
+      const activeModals = document.querySelectorAll('.modal-overlay.active');
+      if (activeModals.length > 0) {
+        activeModals.forEach(m => m.classList.remove('active'));
+        history.pushState(e.state, ''); // Восстанавливаем шаг, чтобы не вылететь из приложения
+        return;
+      }
+      
+      // Возврат по иерархии экранов
+      const s = e.state;
+      if (s && s.view === 'project') this.showProject(s.id, true);
+      else if (s && s.view === 'sphere') this.showSphere(s.id, true);
+      else this.showDashboard(true);
+    });
+
     this.renderSpheres();
     this.renderFocusTasks();
     this.renderInbox();
@@ -464,8 +483,8 @@ palette: [
     }
   },
 
-  // 1. НАВИГАЦИЯ
-  showDashboard() {
+// 1. НАВИГАЦИЯ
+  showDashboard(fromHistory = false) {
     window.LifeState.activeSphereId = null;
     window.LifeState.activeProjectId = null;
     this.viewSphere.classList.remove('active');
@@ -475,12 +494,14 @@ palette: [
     this.renderFocusTasks();
     this.renderInbox();
     window.scrollTo({ top: 0, behavior: 'instant' });
+    
+    if (!fromHistory) history.pushState({ view: 'dashboard' }, '');
   },
 
-  showSphere(sphereId) {
+  showSphere(sphereId, fromHistory = false) {
     const sphere = window.LifeState.getSphere(sphereId);
     if (!sphere) {
-      this.showDashboard();
+      this.showDashboard(fromHistory);
       return;
     }
 
@@ -496,13 +517,15 @@ palette: [
 
     this.renderSphereProjects();
     window.scrollTo({ top: 0, behavior: 'instant' });
+    
+    if (!fromHistory) history.pushState({ view: 'sphere', id: sphereId }, '');
   },
 
-  showProject(projectId) {
+  showProject(projectId, fromHistory = false) {
     const project = window.LifeState.getProject(projectId);
     if (!project) {
-      if (window.LifeState.activeSphereId) this.showSphere(window.LifeState.activeSphereId);
-      else this.showDashboard();
+      if (window.LifeState.activeSphereId) this.showSphere(window.LifeState.activeSphereId, fromHistory);
+      else this.showDashboard(fromHistory);
       return;
     }
 
@@ -516,6 +539,8 @@ palette: [
 
     this.renderProjectTasks();
     window.scrollTo({ top: 0, behavior: 'instant' });
+    
+    if (!fromHistory) history.pushState({ view: 'project', id: projectId }, '');
   },
 
   // 2. СЕТКА ПРОЕКТОВ
@@ -1161,7 +1186,14 @@ palette: [
       const midX = rect.left + rect.width / 2;
       const midY = rect.top + rect.height / 2;
 
-      let isAfter = isGrid ? (Math.abs(e.clientY - midY) > rect.height * 0.2 ? e.clientY > midY : e.clientX > midX) : e.clientY > midY;
+      let isAfter = false;
+      if (isGrid) {
+        // Умная физика: если мы в том же ряду - двигаем по горизонтали, иначе по вертикали
+        const inSameRow = e.clientY >= rect.top && e.clientY <= rect.bottom;
+        isAfter = inSameRow ? e.clientX > midX : e.clientY > midY;
+      } else {
+        isAfter = e.clientY > midY;
+      }
 
       const nextSibling = isAfter ? target.nextElementSibling : target;
       if (nextSibling !== dragEl && nextSibling !== dragEl.nextElementSibling) {
@@ -1247,7 +1279,13 @@ palette: [
       const midX = rect.left + rect.width / 2;
       const midY = rect.top + rect.height / 2;
 
-      let isAfter = isGrid ? (Math.abs(touch.clientY - midY) > rect.height * 0.2 ? touch.clientY > midY : touch.clientX > midX) : touch.clientY > midY;
+      let isAfter = false;
+      if (isGrid) {
+        const inSameRow = touch.clientY >= rect.top && touch.clientY <= rect.bottom;
+        isAfter = inSameRow ? touch.clientX > midX : touch.clientY > midY;
+      } else {
+        isAfter = touch.clientY > midY;
+      }
 
       const nextSibling = isAfter ? target.nextElementSibling : target;
       if (nextSibling !== dragEl && nextSibling !== dragEl.nextElementSibling) {

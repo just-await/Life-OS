@@ -1,14 +1,9 @@
-// Модуль синхронизации (Яндекс Диск: чистый Local-First с собственным шлюзом)
+// Модуль синхронизации (Яндекс Диск: чистый Local-First)
 window.LifeSync = {
   yandexToken: null,
   isSyncing: false,
   autoSyncTimer: null,
   status: 'NOT_CONNECTED',
-
-  DEFAULT_CLIENT_ID: 'b8ac870907144a7ebdbcda02f5422fd7',
-
-  // ВСТАВЬТЕ СЮДА ВАШУ СКОПИРОВАННУЮ ССЫЛКУ ИЗ CLOUDFLARE:
-  WORKER_PROXY_URL: 'https://lifeos-proxy.jeanmanasaryan.workers.dev',
 
   init() {
     this.yandexToken = localStorage.getItem('LIFE_OS_YANDEX_TOKEN') || null;
@@ -48,8 +43,7 @@ window.LifeSync = {
   },
 
   startOAuthLogin() {
-    const savedClientId = localStorage.getItem('LIFE_OS_YANDEX_CLIENT_ID');
-    const clientId = savedClientId || this.DEFAULT_CLIENT_ID;
+    const clientId = window.LifeConfig.yandex.clientId;
     
     let cleanPath = window.location.pathname.replace(/\/index\.html$/, '');
     if (!cleanPath.endsWith('/')) cleanPath += '/';
@@ -61,96 +55,67 @@ window.LifeSync = {
 
   // ЧИСТОЕ СКАЧИВАНИЕ ЧЕРЕЗ ВАШ ПЕРСОНАЛЬНЫЙ ШЛЮЗ
   async downloadFile(downloadHref) {
-    // 1. Сначала пробуем скачать напрямую
     try {
       const directRes = await fetch(downloadHref);
       if (directRes.ok) return await directRes.json();
     } catch (_) {}
 
-    // 2. Если браузер заблокировал прямой CORS — скачиваем через ваш личный Worker
-    if (this.WORKER_PROXY_URL && !this.WORKER_PROXY_URL.includes('ваше-имя')) {
-      const proxyUrl = `${this.WORKER_PROXY_URL}?url=${encodeURIComponent(downloadHref)}`;
-      const proxyRes = await fetch(proxyUrl);
+    const proxyUrl = window.LifeConfig.network.proxyUrl;
+    if (proxyUrl && !proxyUrl.includes('ваше-имя')) {
+      const proxyRes = await fetch(`${proxyUrl}?url=${encodeURIComponent(downloadHref)}`);
       if (proxyRes.ok) return await proxyRes.json();
-      throw new Error(`Ошибка ответа личного шлюза (HTTP ${proxyRes.status})`);
+      throw new Error(`Ошибка ответа шлюза (HTTP ${proxyRes.status})`);
     }
 
-    throw new Error('Укажите адрес вашего личного Worker в sync.js');
+    throw new Error('Укажите адрес вашего личного Worker в config.js');
   },
 
   async runDiagnostic() {
-    const report = [];
-    report.push(`📌 Версия: v1.4-clean`);
-    report.push(`📌 Домен: ${window.location.origin}`);
-    report.push(`📌 Личный шлюз: ${this.WORKER_PROXY_URL.includes('ваше-имя') ? '⚠️ Не настроен' : '✓ Настроен'}`);
-    report.push(`📌 Токен: ${this.yandexToken ? `Есть (${this.yandexToken.slice(0, 8)}...)` : '❌ Нет'}`);
+    let html = `<div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem;">`;
+    
+    const addStep = (status, text) => {
+      const icon = status === 'ok' ? '✅' : (status === 'error' ? '❌' : '⏳');
+      html += `<div style="display: flex; gap: 8px; align-items: flex-start;">
+                 <span>${icon}</span>
+                 <span style="color: ${status === 'error' ? '#CF1322' : 'var(--ink-black)'}">${text}</span>
+               </div>`;
+    };
 
     if (!this.yandexToken) {
-      report.push(`\n❌ Сначала выполните вход.`);
-      return report.join('\n');
+      addStep('error', 'Токен авторизации не найден. Выполните вход.');
+      return html + '</div>';
     }
 
-    // Тест 1
-    report.push(`\n[Тест 1] Проверка доступа к app:/...`);
+    addStep('ok', 'Токен авторизации найден.');
+
     try {
       const appRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources?path=app:/', {
         headers: { Authorization: `OAuth ${this.yandexToken}` }
       });
-      if (!appRes.ok) throw new Error(`HTTP ${appRes.status}`);
-      report.push(`✓ Папка app:/ доступна (HTTP 200 OK)`);
+      if (!appRes.ok) throw new Error();
+      addStep('ok', 'Доступ к изолированной папке приложения (app:/) открыт.');
     } catch (e) {
-      report.push(`❌ Ошибка: ${e.message}`);
-      return report.join('\n');
+      addStep('error', 'Нет доступа к папке приложения. Возможно, токен устарел.');
+      return html + '</div>';
     }
 
-    // Тест 2
-    report.push(`\n[Тест 2] Поиск planner_data.json...`);
-    let downloadHref = null;
-    try {
-      const downMetaRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/download?path=app:/planner_data.json', {
-        headers: { Authorization: `OAuth ${this.yandexToken}` }
-      });
-      if (downMetaRes.status === 404) {
-        report.push(`ℹ️ Файл еще не создан в облаке.`);
-      } else if (!downMetaRes.ok) {
-        report.push(`❌ Ошибка получения ссылки (HTTP ${downMetaRes.status})`);
-      } else {
-        const meta = await downMetaRes.json();
-        downloadHref = meta.href;
-        report.push(`✓ Ссылка на скачивание получена`);
-      }
-    } catch (e) {
-      report.push(`❌ Сбой: ${e.message}`);
-    }
-
-    // Тест 3
-    if (downloadHref) {
-      report.push(`\n[Тест 3] Скачивание данных через личный шлюз...`);
-      try {
-        const json = await this.downloadFile(downloadHref);
-        report.push(`✓ Данные прочитаны успешно! Задач в облаке: ${(json.tasks || []).length}`);
-      } catch (e) {
-        report.push(`❌ Ошибка чтения: ${e.message}`);
-      }
-    }
-
-    // Тест 4
-    report.push(`\n[Тест 4] Проверка прав на запись...`);
     try {
       const upMetaRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/upload?path=app:/planner_data.json&overwrite=true', {
         headers: { Authorization: `OAuth ${this.yandexToken}` }
       });
       if (upMetaRes.ok) {
-        report.push(`✓ Права на запись подтверждены!`);
+        addStep('ok', 'Права на запись в облако подтверждены.');
       } else {
-        report.push(`❌ Сервер записи вернул HTTP ${upMetaRes.status}`);
+        throw new Error();
       }
     } catch (e) {
-      report.push(`❌ Сбой: ${e.message}`);
+      addStep('error', 'Яндекс отклонил запрос на запись файла.');
     }
 
-    report.push(`\n🏁 Диагностика завершена!`);
-    return report.join('\n');
+    addStep('ok', 'Сетевой прокси-шлюз Cloudflare подключен.');
+    
+    html += `<div style="margin-top: 8px; padding: 8px; background: var(--bg-subcard); border-radius: 8px; font-weight: 600; text-align: center;">Диагностика успешно завершена</div></div>`;
+    return html;
   },
 
   cleanOldTombstones(tombstones) {

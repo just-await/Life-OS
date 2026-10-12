@@ -142,18 +142,22 @@ palette: [
     this.initTheme();
     if (window.LifeSync) window.LifeSync.init();
 
+    // Автоматически подставляем ссылку на донат из config.js в кнопку
+    const donateBtn = document.querySelector('.donation-card a');
+    if (donateBtn && window.LifeConfig && window.LifeConfig.donationUrl) {
+      donateBtn.href = window.LifeConfig.donationUrl;
+    }
+
     // Роутинг: перехват физической кнопки "Назад" на телефонах
     history.replaceState({ view: 'dashboard' }, '');
     window.addEventListener('popstate', (e) => {
-      // Если открыта любая модалка (окно) - просто закрываем её
       const activeModals = document.querySelectorAll('.modal-overlay.active');
       if (activeModals.length > 0) {
         activeModals.forEach(m => m.classList.remove('active'));
-        history.pushState(e.state, ''); // Восстанавливаем шаг, чтобы не вылететь из приложения
+        history.pushState(e.state, '');
         return;
       }
       
-      // Возврат по иерархии экранов
       const s = e.state;
       if (s && s.view === 'project') this.showProject(s.id, true);
       else if (s && s.view === 'sphere') this.showSphere(s.id, true);
@@ -433,7 +437,7 @@ palette: [
   customAlert(message, title = 'Внимание') {
     return new Promise((resolve) => {
       this.customDialogTitle.textContent = title;
-      this.customDialogMessage.textContent = message;
+      this.customDialogMessage.innerHTML = message; // Заменили textContent на innerHTML
       this.customDialogPromptBox.style.display = 'none';
       this.customDialogCancelBtn.style.display = 'none';
       this.customDialogConfirmBtn.textContent = 'Понятно';
@@ -696,12 +700,31 @@ palette: [
       if (task.deadline) {
         badgesHtml += `<span class="task-property-badge">📅 ${this.formatDate(task.deadline)}</span>`;
       }
-      if (task.checklist && task.checklist.length > 0) {
-        const done = task.checklist.filter(s => s.completed).length;
-        badgesHtml += `<span class="task-property-badge">☑️ ${done}/${task.checklist.length}</span>`;
-      }
       if (task.note && task.note.trim()) {
         badgesHtml += `<span class="task-property-badge">📝</span>`;
+      }
+
+      let inlineChecklistHtml = '';
+      if (task.checklist && task.checklist.length > 0) {
+        const done = task.checklist.filter(s => s.completed).length;
+        const total = task.checklist.length;
+        const listItems = task.checklist.map((c, idx) => `
+          <div class="inline-subtask-row ${c.completed ? 'completed' : ''}">
+            <input type="checkbox" class="task-checkbox inline-subtask-chk" data-task-id="${safeTaskId}" data-sub-idx="${idx}" ${c.completed ? 'checked' : ''} style="width:18px;height:18px;min-width:18px;min-height:18px;">
+            <span>${this.escapeHtml(c.text)}</span>
+          </div>
+        `).join('');
+
+        inlineChecklistHtml = `
+          <div class="inline-checklist-wrap">
+            <button class="inline-checklist-toggle" data-toggle-id="proj-${safeTaskId}">
+              ☑️ Подзадачи (${done}/${total}) <span class="chevron">▼</span>
+            </button>
+            <div class="inline-checklist-body" id="chkbody-proj-${safeTaskId}" style="display: none;">
+              ${listItems}
+            </div>
+          </div>
+        `;
       }
 
       return `
@@ -718,6 +741,7 @@ palette: [
               <div class="task-badges-left">${badgesHtml}</div>
             </div>
           ` : ''}
+          ${inlineChecklistHtml}
         </div>
       `;
     }).join('');
@@ -739,13 +763,13 @@ palette: [
         const updated = window.LifeState.toggleTaskCompleted(taskId);
 
         if (updated && updated.completed) {
-          if (navigator.vibrate) navigator.vibrate(40);
+          if (window.LifeConfig) window.LifeConfig.vibrate(40);
           if (window.LifeConfetti) {
             const rect = e.target.getBoundingClientRect();
             window.LifeConfetti.shoot(rect.left + rect.width / 2, rect.top + rect.height / 2);
           }
         } else if (updated && !updated.completed) {
-          if (navigator.vibrate) navigator.vibrate(20);
+          if (window.LifeConfig) window.LifeConfig.vibrate(20);
         }
 
         this.renderProjectTasks();
@@ -771,6 +795,37 @@ palette: [
       el.addEventListener('click', () => {
         const taskId = el.getAttribute('data-task-id');
         this.openTaskDetailModal(taskId);
+      });
+    });
+
+    this.projectTasksList.querySelectorAll('.inline-checklist-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bodyId = `chkbody-${btn.getAttribute('data-toggle-id')}`;
+        const body = document.getElementById(bodyId);
+        const chev = btn.querySelector('.chevron');
+        if (body.style.display === 'none') {
+          body.style.display = 'flex';
+          chev.textContent = '▲';
+        } else {
+          body.style.display = 'none';
+          chev.textContent = '▼';
+        }
+      });
+    });
+
+    this.projectTasksList.querySelectorAll('.inline-subtask-chk').forEach(chk => {
+      chk.addEventListener('change', (e) => {
+        const taskId = chk.getAttribute('data-task-id');
+        const idx = chk.getAttribute('data-sub-idx');
+        const task = window.LifeState.getTask(taskId);
+        if (task && task.checklist && task.checklist[idx]) {
+          task.checklist[idx].completed = chk.checked;
+          task.updatedAt = Date.now();
+          window.LifeStorage.save(window.LifeState.data);
+          if (window.LifeConfig) window.LifeConfig.vibrate(20);
+          this.renderProjectTasks();
+          if (window.LifeSync) window.LifeSync.triggerAutoSync();
+        }
       });
     });
   },
@@ -880,13 +935,31 @@ palette: [
       } else if (task.deadline) {
         badgesHtml += `<span class="task-property-badge">📅 ${this.formatDate(task.deadline)}</span>`;
       }
-
-      if (task.checklist && task.checklist.length > 0) {
-        const done = task.checklist.filter(s => s.completed).length;
-        badgesHtml += `<span class="task-property-badge">☑️ ${done}/${task.checklist.length}</span>`;
-      }
       if (task.note && task.note.trim()) {
         badgesHtml += `<span class="task-property-badge">📝</span>`;
+      }
+
+      let inlineChecklistHtml = '';
+      if (task.checklist && task.checklist.length > 0) {
+        const done = task.checklist.filter(s => s.completed).length;
+        const total = task.checklist.length;
+        const listItems = task.checklist.map((c, idx) => `
+          <div class="inline-subtask-row ${c.completed ? 'completed' : ''}">
+            <input type="checkbox" class="task-checkbox inline-subtask-chk" data-task-id="${safeTaskId}" data-sub-idx="${idx}" ${c.completed ? 'checked' : ''} style="width:18px;height:18px;min-width:18px;min-height:18px;">
+            <span>${this.escapeHtml(c.text)}</span>
+          </div>
+        `).join('');
+
+        inlineChecklistHtml = `
+          <div class="inline-checklist-wrap" style="width:100%;">
+            <button class="inline-checklist-toggle" data-toggle-id="foc-${safeTaskId}">
+              ☑️ Подзадачи (${done}/${total}) <span class="chevron">▼</span>
+            </button>
+            <div class="inline-checklist-body" id="chkbody-foc-${safeTaskId}" style="display: none;">
+              ${listItems}
+            </div>
+          </div>
+        `;
       }
 
       return `
@@ -906,6 +979,7 @@ palette: [
               ${safeProject}
             </span>
           </div>
+          ${inlineChecklistHtml}
         </div>
       `;
     }).join('');
@@ -921,13 +995,13 @@ palette: [
         const updatedTask = window.LifeState.toggleTaskCompleted(taskId);
 
         if (updatedTask && updatedTask.completed) {
-          if (navigator.vibrate) navigator.vibrate(40); // Тактильный щелчок
+          if (window.LifeConfig) window.LifeConfig.vibrate(40);
           if (window.LifeConfetti) {
             const rect = e.target.getBoundingClientRect();
             window.LifeConfetti.shoot(rect.left + rect.width / 2, rect.top + rect.height / 2);
           }
         } else if (updatedTask && !updatedTask.completed) {
-          if (navigator.vibrate) navigator.vibrate(20); // Легкий отклик при снятии галочки
+          if (window.LifeConfig) window.LifeConfig.vibrate(20);
         }
 
         this.renderFocusTasks();
@@ -944,6 +1018,37 @@ palette: [
         this.renderFocusTasks();
         this.renderSpheres();
         if (window.LifeSync) window.LifeSync.triggerAutoSync();
+      });
+    });
+
+    this.focusList.querySelectorAll('.inline-checklist-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bodyId = `chkbody-${btn.getAttribute('data-toggle-id')}`;
+        const body = document.getElementById(bodyId);
+        const chev = btn.querySelector('.chevron');
+        if (body.style.display === 'none') {
+          body.style.display = 'flex';
+          chev.textContent = '▲';
+        } else {
+          body.style.display = 'none';
+          chev.textContent = '▼';
+        }
+      });
+    });
+
+    this.focusList.querySelectorAll('.inline-subtask-chk').forEach(chk => {
+      chk.addEventListener('change', (e) => {
+        const taskId = chk.getAttribute('data-task-id');
+        const idx = chk.getAttribute('data-sub-idx');
+        const task = window.LifeState.getTask(taskId);
+        if (task && task.checklist && task.checklist[idx]) {
+          task.checklist[idx].completed = chk.checked;
+          task.updatedAt = Date.now();
+          window.LifeStorage.save(window.LifeState.data);
+          if (window.LifeConfig) window.LifeConfig.vibrate(20);
+          this.renderFocusTasks();
+          if (window.LifeSync) window.LifeSync.triggerAutoSync();
+        }
       });
     });
   },

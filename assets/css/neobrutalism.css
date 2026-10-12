@@ -66,6 +66,7 @@
   cursor: pointer;
   transition: transform var(--transition-tactile);
   user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .neo-folder:hover {

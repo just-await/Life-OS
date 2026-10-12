@@ -175,6 +175,7 @@ body {
   box-shadow: 2px 2px 0 var(--shadow-color);
   transition: transform var(--transition-tactile);
   touch-action: manipulation;
+  -webkit-touch-callout: none;
 }
 
 /* Визуальный стиль перетаскивания */
@@ -184,6 +185,8 @@ body {
   box-shadow: none !important;
   transform: none !important;
   pointer-events: none !important;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
 }
 
 .neo-folder.dragging .folder-card,

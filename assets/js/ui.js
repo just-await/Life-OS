@@ -1158,12 +1158,21 @@ palette: [
     let touchStartX = 0;
     let touchStartY = 0;
 
+    // ---- 1. МЕХАНИКА ДЛЯ ПК (МЫШЬ) ----
     container.addEventListener('dragstart', (e) => {
       const item = e.target.closest(itemSelector);
       if (!item || item.parentElement !== container) return;
 
       this.isDragging = true;
       dragEl = item;
+
+      // Вычисляем смещение хвата (чтобы физика считала центр карточки, а не курсор)
+      const rect = item.getBoundingClientRect();
+      dragEl._dragOffsetX = e.clientX - rect.left;
+      dragEl._dragOffsetY = e.clientY - rect.top;
+      dragEl._dragWidth = rect.width;
+      dragEl._dragHeight = rect.height;
+
       setTimeout(() => item && item.classList.add('dragging'), 0);
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', item.getAttribute(idAttr) || '');
@@ -1186,13 +1195,17 @@ palette: [
       const midX = rect.left + rect.width / 2;
       const midY = rect.top + rect.height / 2;
 
+      // Вычисляем, где физически находится ЦЕНТР перетаскиваемой карточки
+      const ghostCenterX = e.clientX - dragEl._dragOffsetX + dragEl._dragWidth / 2;
+      const ghostCenterY = e.clientY - dragEl._dragOffsetY + dragEl._dragHeight / 2;
+
       let isAfter = false;
       if (isGrid) {
-        // Умная физика: если мы в том же ряду - двигаем по горизонтали, иначе по вертикали
-        const inSameRow = e.clientY >= rect.top && e.clientY <= rect.bottom;
-        isAfter = inSameRow ? e.clientX > midX : e.clientY > midY;
+        // Мягкая проверка рядов: если центры на одной высоте - двигаем по оси X
+        const inSameRow = Math.abs(ghostCenterY - midY) < rect.height * 0.4;
+        isAfter = inSameRow ? ghostCenterX > midX : ghostCenterY > midY;
       } else {
-        isAfter = e.clientY > midY;
+        isAfter = ghostCenterY > midY;
       }
 
       const nextSibling = isAfter ? target.nextElementSibling : target;
@@ -1221,9 +1234,7 @@ palette: [
         .map(el => el.getAttribute(idAttr))
         .filter(Boolean);
 
-      if (container._dndReorderCallback) {
-        container._dndReorderCallback(newOrder);
-      }
+      if (container._dndReorderCallback) container._dndReorderCallback(newOrder);
 
       if (this.pendingRender) {
         this.pendingRender = false;
@@ -1231,10 +1242,15 @@ palette: [
       }
     });
 
+    // ---- 2. МЕХАНИКА ДЛЯ ТЕЛЕФОНОВ (ПАЛЕЦ) ----
     container.addEventListener('touchstart', (e) => {
       const item = e.target.closest(itemSelector);
       if (!item || item.parentElement !== container) return;
       if (e.target.closest('button, input, textarea, a, .task-checkbox')) return;
+
+      // Жестко отключаем системные выделения, чтобы не вылезал "призрак" iOS
+      item.style.webkitUserSelect = 'none';
+      item.setAttribute('draggable', 'false');
 
       const touch = e.touches[0];
       touchStartX = touch.clientX;
@@ -1245,19 +1261,34 @@ palette: [
         window.LifeUI.isDragging = true;
         dragEl = item;
         isTouchDragging = true;
+
+        const rect = item.getBoundingClientRect();
+        dragEl._dragOffsetX = touchStartX - rect.left;
+        dragEl._dragOffsetY = touchStartY - rect.top;
+        dragEl._dragWidth = rect.width;
+        dragEl._dragHeight = rect.height;
+
         item.classList.add('dragging');
         if (navigator.vibrate) navigator.vibrate(30);
       }, 190);
     }, { passive: true });
 
+    // Блокируем вызов системного меню копирования на долгом тапе
+    container.addEventListener('contextmenu', (e) => {
+      if (isTouchDragging || window.LifeUI.isDragging) e.preventDefault();
+    });
+
     container.addEventListener('touchmove', (e) => {
       const touch = e.touches[0];
 
       if (!isTouchDragging) {
+        // Если человек скроллит (а не тащит), возвращаем обычное поведение
         const deltaX = Math.abs(touch.clientX - touchStartX);
         const deltaY = Math.abs(touch.clientY - touchStartY);
         if (deltaX > 8 || deltaY > 8) {
           clearTimeout(touchTimer);
+          const item = e.target.closest(itemSelector);
+          if (item) item.setAttribute('draggable', 'true');
         }
         return;
       }
@@ -1279,30 +1310,47 @@ palette: [
       const midX = rect.left + rect.width / 2;
       const midY = rect.top + rect.height / 2;
 
+      // Умная геометрия центра для пальца
+      const ghostCenterX = touch.clientX - dragEl._dragOffsetX + dragEl._dragWidth / 2;
+      const ghostCenterY = touch.clientY - dragEl._dragOffsetY + dragEl._dragHeight / 2;
+
       let isAfter = false;
       if (isGrid) {
-        const inSameRow = touch.clientY >= rect.top && touch.clientY <= rect.bottom;
-        isAfter = inSameRow ? touch.clientX > midX : touch.clientY > midY;
+        const inSameRow = Math.abs(ghostCenterY - midY) < rect.height * 0.4;
+        isAfter = inSameRow ? ghostCenterX > midX : ghostCenterY > midY;
       } else {
-        isAfter = touch.clientY > midY;
+        isAfter = ghostCenterY > midY;
       }
 
       const nextSibling = isAfter ? target.nextElementSibling : target;
       if (nextSibling !== dragEl && nextSibling !== dragEl.nextElementSibling) {
         container.insertBefore(dragEl, nextSibling);
+        if (navigator.vibrate) navigator.vibrate(10); // Микро-щелчок при перестановке
       }
     }, { passive: false });
 
-    const finishTouch = () => {
+    const finishTouch = (e) => {
       clearTimeout(touchTimer);
       this.stopAutoScroll();
       window.LifeUI.isDragging = false;
 
+      // Сбрасываем блокировки после того, как палец убрали
+      if (dragEl) {
+        dragEl.setAttribute('draggable', 'true');
+        dragEl.style.webkitUserSelect = '';
+      } else {
+        const item = e.target.closest(itemSelector);
+        if (item) {
+          item.setAttribute('draggable', 'true');
+          item.style.webkitUserSelect = '';
+        }
+      }
+
       if (isTouchDragging && dragEl) {
-        const item = dragEl;
-        item.classList.remove('dragging');
-        item.classList.add('was-dragged');
-        setTimeout(() => item.classList.remove('was-dragged'), 300);
+        const draggedItem = dragEl;
+        draggedItem.classList.remove('dragging');
+        draggedItem.classList.add('was-dragged');
+        setTimeout(() => draggedItem.classList.remove('was-dragged'), 300);
 
         dragEl = null;
         isTouchDragging = false;
@@ -1311,9 +1359,7 @@ palette: [
           .map(el => el.getAttribute(idAttr))
           .filter(Boolean);
 
-        if (container._dndReorderCallback) {
-          container._dndReorderCallback(newOrder);
-        }
+        if (container._dndReorderCallback) container._dndReorderCallback(newOrder);
       } else {
         dragEl = null;
         isTouchDragging = false;

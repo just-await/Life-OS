@@ -279,49 +279,56 @@ window.LifeSync = {
     try {
       let remoteData = null;
 
-      // 1. Метаданные скачивания
+      // 1. Получаем ссылку на скачивание файла из облака
       const downMetaRes = await fetch(`https://cloud-api.yandex.net/v1/disk/resources/download?path=${encodeURIComponent(filePath)}&_ts=${cacheBuster}`, {
         headers: { Authorization: `OAuth ${this.yandexToken}` }
       });
 
       if (downMetaRes.status === 401 || downMetaRes.status === 403) {
-        this.setStatus('AUTH_ERROR');
-        throw new Error('Токен Яндекса недействителен или нет прав на папку app:/');
+        throw new Error('AUTH_ERROR: Токен Яндекса недействителен или нет прав');
       }
 
       if (downMetaRes.status === 404) {
-        remoteData = null;
+        remoteData = null; // Файла еще нет в облаке (например, при первом запуске)
       } else if (!downMetaRes.ok) {
         throw new Error(`Ошибка сервиса Яндекса (HTTP ${downMetaRes.status})`);
       } else {
         const downMeta = await downMetaRes.json();
-        // 2. Скачивание файла через личный шлюз
         let rawDownload = await this.downloadFile(downMeta.href);
         
-        // Если структура файла обернута (как при ручном бэкапе)
+        // Разворачиваем файл, если он был загружен в облако вручную как бэкап
         if (rawDownload && rawDownload.data) {
           rawDownload = rawDownload.data;
         }
         
-        // Прогоняем через фильтр, чтобы сломанный файл не "убил" систему
-        remoteData = window.LifeBackup.sanitizeData(rawDownload);
+        // МЯГКАЯ НОРМАЛИЗАЦИЯ: защищаем от крашей, но не удаляем пользовательские данные
+        if (rawDownload && typeof rawDownload === 'object') {
+          remoteData = {
+            ...rawDownload,
+            spheres: Array.isArray(rawDownload.spheres) ? rawDownload.spheres : [],
+            projects: Array.isArray(rawDownload.projects) ? rawDownload.projects : [],
+            tasks: Array.isArray(rawDownload.tasks) ? rawDownload.tasks : [],
+            inbox: Array.isArray(rawDownload.inbox) ? rawDownload.inbox : [],
+            tombstones: (rawDownload.tombstones && typeof rawDownload.tombstones === 'object') ? rawDownload.tombstones : {}
+          };
+        }
       }
 
-      // 3. Слияние данных
+      // 2. Умное слияние локальных и облачных данных
       const localData = window.LifeState.data || window.LifeStorage.load();
       const mergedData = this.mergeData(localData, remoteData);
 
+      // Сохраняем объединенные данные локально
       window.LifeStorage.save(mergedData);
       window.LifeState.data = mergedData;
 
-      // 4. Ссылка на загрузку
+      // 3. Запрашиваем у Яндекса ссылку для записи обновленных данных
       const upMetaRes = await fetch(`https://cloud-api.yandex.net/v1/disk/resources/upload?path=${encodeURIComponent(filePath)}&overwrite=true&_ts=${cacheBuster}`, {
         headers: { Authorization: `OAuth ${this.yandexToken}` }
       });
 
       if (upMetaRes.status === 401 || upMetaRes.status === 403) {
-        this.setStatus('AUTH_ERROR');
-        throw new Error('Токен недействителен или нет прав на запись');
+        throw new Error('AUTH_ERROR: Нет прав на запись');
       }
 
       if (!upMetaRes.ok) {
@@ -329,8 +336,8 @@ window.LifeSync = {
       }
 
       const upMeta = await upMetaRes.json();
-
-      // 5. Запись на Диск
+      
+      // 4. Отправляем обновленный файл в облако
       const uploadRes = await fetch(upMeta.href, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -346,14 +353,18 @@ window.LifeSync = {
       this.setStatus('SYNCED');
 
       if (callback) callback({ success: true, timestamp: Date.now(), silent });
+
     } catch (err) {
+      console.error('[Life OS Sync Error]:', err); // Точное логирование ошибки для разработчика
       this.isSyncing = false;
-      const isAuthErr = err.message.includes('недействителен') || err.message.includes('нет прав');
+      
+      const isAuthErr = err.message.includes('AUTH_ERROR');
       if (isAuthErr) {
         this.setStatus('AUTH_ERROR');
       } else {
         this.setStatus('OFFLINE');
       }
+      
       if (callback) callback({ success: false, error: err.message, isAuthErr, silent });
     }
   },

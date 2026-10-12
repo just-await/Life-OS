@@ -54,114 +54,222 @@ window.LifeSync = {
   },
 
   // ЧИСТОЕ СКАЧИВАНИЕ ЧЕРЕЗ ВАШ ПЕРСОНАЛЬНЫЙ ШЛЮЗ
-  async downloadFile(downloadHref) {
+  // Вспомогательный метод быстрых сетевых запросов с защитой от 30-секундных зависаний
+  async fetchWithTimeout(url, options = {}, timeoutMs = 4500) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const directRes = await fetch(downloadHref);
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timer);
+      return res;
+    } catch (err) {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') {
+        throw new Error('TIMEOUT');
+      }
+      throw err;
+    }
+  },
+
+  // ЧИСТОЕ И БЫСТРОЕ СКАЧИВАНИЕ ЧЕРЕЗ ШЛЮЗ
+  async downloadFile(downloadHref) {
+    // 1. Сначала пробуем скачать напрямую с Яндекса (быстрый таймаут 2.5 сек)
+    try {
+      const directRes = await this.fetchWithTimeout(downloadHref, {}, 2500);
       if (directRes.ok) return await directRes.json();
     } catch (_) {}
 
+    // 2. Если браузер заблокировал прямой CORS — скачиваем через личный Worker
     const proxyUrl = window.LifeConfig.network.proxyUrl;
     if (proxyUrl && !proxyUrl.includes('ваше-имя')) {
-      const proxyRes = await fetch(`${proxyUrl}?url=${encodeURIComponent(downloadHref)}`);
-      if (proxyRes.ok) return await proxyRes.json();
-      throw new Error(`Ошибка ответа шлюза (HTTP ${proxyRes.status})`);
+      try {
+        // Таймаут 4.5 сек вместо 30-секундного зависания при блокировках ТСПУ
+        const proxyRes = await this.fetchWithTimeout(`${proxyUrl}?url=${encodeURIComponent(downloadHref)}`, {}, 4500);
+        if (proxyRes.ok) return await proxyRes.json();
+        throw new Error(`HTTP ${proxyRes.status}`);
+      } catch (err) {
+        if (err.message === 'TIMEOUT' || err.name === 'AbortError') {
+          throw new Error('Шлюз заблокирован провайдером (таймаут ответа)');
+        }
+        throw new Error(`Ошибка шлюза (${err.message})`);
+      }
     }
 
     throw new Error('Укажите адрес вашего личного Worker в config.js');
   },
 
+  // ЭКСПРЕСС-ДИАГНОСТИКА В РЕАЛЬНОМ ВРЕМЕНИ (ЖИВОЙ РЕЖИМ)
   async runDiagnostic() {
-    let html = `<div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.88rem; text-align: left;">`;
-    
-    const addStep = (status, title, desc = '') => {
-      const icon = status === 'ok' ? '✅' : (status === 'error' ? '❌' : 'ℹ️');
-      const titleColor = status === 'error' ? '#CF1322' : 'var(--ink-black)';
-      html += `
-        <div style="display: flex; gap: 10px; align-items: flex-start; background: var(--bg-card); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-color);">
-          <span style="font-size: 1.1rem; line-height: 1.2;">${icon}</span>
-          <div style="display: flex; flex-direction: column; gap: 2px;">
-            <strong style="color: ${titleColor};">${title}</strong>
-            ${desc ? `<span style="font-size: 0.78rem; color: var(--ink-muted); line-height: 1.3;">${desc}</span>` : ''}
+    const modal = document.getElementById('customDialogModal');
+    const titleEl = document.getElementById('customDialogTitle');
+    const msgEl = document.getElementById('customDialogMessage');
+    const confirmBtn = document.getElementById('customDialogConfirmBtn');
+    const cancelBtn = document.getElementById('customDialogCancelBtn');
+    const promptBox = document.getElementById('customDialogPromptBox');
+
+    // Шаги диагностики
+    const steps = [
+      { id: 'token', name: 'Ключ авторизации Яндекс ID', status: 'pending', desc: 'Ожидание проверки...' },
+      { id: 'yandex', name: 'Связь с серверами Яндекса', status: 'pending', desc: 'Ожидание проверки...' },
+      { id: 'proxy', name: 'Шлюз Cloudflare (Обход CORS)', status: 'pending', desc: 'Ожидание проверки...' },
+      { id: 'write', name: 'Права на запись в хранилище', status: 'pending', desc: 'Ожидание проверки...' }
+    ];
+
+    const render = (finalVerdict = null) => {
+      let content = `<div style="display: flex; flex-direction: column; gap: 8px; text-align: left;">`;
+      
+      steps.forEach(s => {
+        let icon = '⏳';
+        let color = 'var(--ink-muted)';
+        if (s.status === 'running') { icon = '⚡'; color = 'var(--folder-amber)'; }
+        if (s.status === 'ok') { icon = '✅'; color = 'var(--accent-done)'; }
+        if (s.status === 'error') { icon = '❌'; color = '#CF1322'; }
+
+        content += `
+          <div style="display: flex; gap: 10px; align-items: flex-start; background: var(--bg-card); padding: 8px 12px; border-radius: 10px; border: 1.5px solid var(--border-color);">
+            <span style="font-size: 1.15rem; line-height: 1.2;">${icon}</span>
+            <div style="display: flex; flex-direction: column; gap: 1px;">
+              <strong style="font-size: 0.88rem; color: ${s.status === 'error' ? '#CF1322' : 'var(--ink-black)'};">${s.name}</strong>
+              <span style="font-size: 0.76rem; color: ${color}; line-height: 1.25;">${s.desc}</span>
+            </div>
           </div>
-        </div>`;
+        `;
+      });
+
+      if (finalVerdict) {
+        content += finalVerdict;
+      }
+      content += `</div>`;
+
+      if (msgEl) msgEl.innerHTML = content;
     };
 
-    // 1. Проверка токена
-    if (!this.yandexToken) {
-      addStep('error', 'Токен авторизации не найден', 'Сначала выполните вход через Яндекс ID.');
-      return html + '</div>';
+    // МГНОВЕННО открываем окно перед началом проверок
+    if (modal && titleEl && msgEl) {
+      titleEl.textContent = '🔍 Экспресс-диагностика';
+      if (cancelBtn) cancelBtn.style.display = 'none';
+      if (promptBox) promptBox.style.display = 'none';
+      if (confirmBtn) confirmBtn.style.display = 'none'; // Скрываем кнопку, пока идет проверка
+      render();
+      modal.classList.add('active');
     }
-    addStep('ok', 'Токен Яндекс ID найден', 'Ключ авторизации сохранен на устройстве.');
 
-    // 2. Проверка доступа к Яндекс Диску (сервера Яндекса)
+    // ТЕСТ 1: Токен
+    steps[0].status = 'running';
+    steps[0].desc = 'Проверка наличия токена на устройстве...';
+    render();
+    await new Promise(r => setTimeout(r, 120)); // Легкая пауза для плавности глаза
+
+    if (!this.yandexToken) {
+      steps[0].status = 'error';
+      steps[0].desc = 'Токен не найден. Нажмите «Войти через Яндекс ID».';
+      steps[1].desc = 'Отменено';
+      steps[2].desc = 'Отменено';
+      steps[3].desc = 'Отменено';
+      const verdict = `<div style="margin-top: 6px; padding: 10px; background: #FFF1F0; color: #CF1322; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.82rem; border: 1.5px solid #FFA39E;">Требуется авторизация</div>`;
+      render(verdict);
+      if (confirmBtn) { confirmBtn.style.display = 'inline-flex'; confirmBtn.textContent = 'Понятно'; }
+      return msgEl.innerHTML;
+    }
+    steps[0].status = 'ok';
+    steps[0].desc = 'Токен найден и загружен в память.';
+    render();
+
+    // ТЕСТ 2: Серверы Яндекса в РФ
+    steps[1].status = 'running';
+    steps[1].desc = 'Запрос к API Яндекса (cloud-api.yandex.net)...';
+    render();
+
     let downloadHref = null;
     try {
-      const appRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources?path=app:/', {
+      const appRes = await this.fetchWithTimeout('https://cloud-api.yandex.net/v1/disk/resources?path=app:/', {
         headers: { Authorization: `OAuth ${this.yandexToken}` }
-      });
+      }, 4000);
       if (!appRes.ok) throw new Error(`HTTP ${appRes.status}`);
-      addStep('ok', 'Связь с серверами Яндекса есть', 'Папка приложения app:/ доступна.');
+      steps[1].status = 'ok';
+      steps[1].desc = 'Связь стабильна. Папка app:/ доступна.';
     } catch (e) {
-      addStep('error', 'Сбой доступа к Яндекс Диску', 'Возможно, токен устарел. Попробуйте войти заново.');
-      return html + '</div>';
+      steps[1].status = 'error';
+      steps[1].desc = e.message === 'TIMEOUT' ? 'Таймаут соединения с Яндексом.' : 'Отклонено Яндексом (токен недействителен).';
+      steps[2].desc = 'Отменено';
+      steps[3].desc = 'Отменено';
+      const verdict = `<div style="margin-top: 6px; padding: 10px; background: #FFF1F0; color: #CF1322; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.82rem; border: 1.5px solid #FFA39E;">Сбой связи с серверами Яндекса</div>`;
+      render(verdict);
+      if (confirmBtn) { confirmBtn.style.display = 'inline-flex'; confirmBtn.textContent = 'Понятно'; }
+      return msgEl.innerHTML;
     }
+    render();
 
-    // 3. Получение метаданных файла
+    // ТЕСТ 3: Прокси-шлюз Cloudflare (С реальным таймаутом против блокировок ТСПУ)
+    steps[2].status = 'running';
+    steps[2].desc = 'Тестирование скачивания через шлюз Cloudflare...';
+    render();
+
     try {
-      const downMetaRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/download?path=app:/planner_data.json', {
+      const downMetaRes = await this.fetchWithTimeout('https://cloud-api.yandex.net/v1/disk/resources/download?path=app:/planner_data.json', {
         headers: { Authorization: `OAuth ${this.yandexToken}` }
-      });
-      if (downMetaRes.status === 404) {
-        addStep('info', 'Файл базы в облаке еще не создан', 'Это нормально, если синхронизация запускается впервые.');
-      } else if (downMetaRes.ok) {
+      }, 4000);
+
+      if (downMetaRes.ok) {
         const meta = await downMetaRes.json();
         downloadHref = meta.href;
-        addStep('ok', 'Файл базы найден на Диске', 'Ссылка на чтение данных успешно получена.');
       }
-    } catch (e) {
-      addStep('error', 'Ошибка получения ссылки на файл', e.message);
-    }
+    } catch (_) {}
 
-    // 4. НАСТОЯЩИЙ ТЕСТ ПРОКСИ-ШЛЮЗА CLOUDFLARE (Проверка блокировки РКН / VPN)
-    if (downloadHref) {
-      try {
-        const json = await this.downloadFile(downloadHref);
-        addStep('ok', 'Прокси-шлюз Cloudflare работает', `Данные успешно прочитаны через шлюз. Задач в облаке: ${(json.tasks || []).length}`);
-      } catch (e) {
-        addStep('error', 'Шлюз Cloudflare заблокирован (Нужен VPN)', 'Домен workers.dev заблокирован провайдерами РФ. Включите VPN или привяжите свой домен к Worker.');
-        html += `<div style="margin-top: 6px; padding: 8px; background: #FFF1F0; color: #CF1322; border-radius: 8px; font-weight: 700; text-align: center; font-size: 0.8rem; border: 1px solid #FFA39E;">Синхронизация невозможна без VPN из-за блокировки шлюза</div></div>`;
-        return html;
-      }
-    } else {
-      // Если файла еще нет, тестируем сам шлюз тестовым запросом
-      try {
-        const proxyUrl = window.LifeConfig.network.proxyUrl;
-        const testRes = await fetch(`${proxyUrl}?url=${encodeURIComponent('https://yandex.ru')}`);
-        if (!testRes.ok && testRes.status !== 200) throw new Error();
-        addStep('ok', 'Прокси-шлюз Cloudflare доступен', 'Соединение со шлюзом прошло проверку.');
-      } catch (e) {
-        addStep('error', 'Шлюз Cloudflare недоступен (Нужен VPN)', 'Домен workers.dev заблокирован в РФ. Включите VPN.');
-        html += `<div style="margin-top: 6px; padding: 8px; background: #FFF1F0; color: #CF1322; border-radius: 8px; font-weight: 700; text-align: center; font-size: 0.8rem; border: 1px solid #FFA39E;">Синхронизация невозможна без VPN из-за блокировки шлюза</div></div>`;
-        return html;
-      }
-    }
-
-    // 5. Проверка прав на запись
     try {
-      const upMetaRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/upload?path=app:/planner_data.json&overwrite=true', {
-        headers: { Authorization: `OAuth ${this.yandexToken}` }
-      });
-      if (upMetaRes.ok) {
-        addStep('ok', 'Права на запись в облако подтверждены', 'Яндекс готов сохранять изменения.');
+      if (downloadHref) {
+        // Проверяем реальное скачивание файла через шлюз
+        await this.downloadFile(downloadHref);
+        steps[2].status = 'ok';
+        steps[2].desc = 'Шлюз ответил успешно, данные базы прочитаны.';
       } else {
-        throw new Error();
+        // Если файла еще нет — проверяем шлюз быстрым тестовым пингом
+        const proxyUrl = window.LifeConfig.network.proxyUrl;
+        const pingRes = await this.fetchWithTimeout(`${proxyUrl}?url=${encodeURIComponent('https://ya.ru')}`, {}, 4500);
+        if (!pingRes.ok) throw new Error();
+        steps[2].status = 'ok';
+        steps[2].desc = 'Шлюз Cloudflare на связи и готов к работе.';
       }
     } catch (e) {
-      addStep('error', 'Яндекс отклонил запрос на запись', 'Проверьте свободное место на Диске.');
+      steps[2].status = 'error';
+      steps[2].desc = 'Шлюз заблокирован оператором (нужен VPN).';
+      steps[3].desc = 'Отменено';
+      const verdict = `<div style="margin-top: 6px; padding: 10px; background: #FFF1F0; color: #CF1322; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.8rem; border: 1.5px solid #FFA39E;">Домен workers.dev заблокирован мобильным оператором. Включите VPN или привяжите свой домен.</div>`;
+      render(verdict);
+      if (confirmBtn) { confirmBtn.style.display = 'inline-flex'; confirmBtn.textContent = 'Понятно'; }
+      return msgEl.innerHTML;
+    }
+    render();
+
+    // ТЕСТ 4: Права на запись
+    steps[3].status = 'running';
+    steps[3].desc = 'Проверка разрешений на запись в хранилище...';
+    render();
+
+    try {
+      const upMetaRes = await this.fetchWithTimeout('https://cloud-api.yandex.net/v1/disk/resources/upload?path=app:/planner_data.json&overwrite=true', {
+        headers: { Authorization: `OAuth ${this.yandexToken}` }
+      }, 4000);
+      if (!upMetaRes.ok) throw new Error();
+      steps[3].status = 'ok';
+      steps[3].desc = 'Хранилище свободно, запись разрешена.';
+    } catch (e) {
+      steps[3].status = 'error';
+      steps[3].desc = 'Яндекс отклонил запись (возможно, нет места).';
     }
 
-    html += `<div style="margin-top: 6px; padding: 8px; background: var(--bg-subcard); border-radius: 8px; font-weight: 700; text-align: center; font-size: 0.82rem;">Все системы работают штатно</div></div>`;
-    return html;
+    const allOk = steps.every(s => s.status === 'ok');
+    const finalBanner = allOk
+      ? `<div style="margin-top: 6px; padding: 10px; background: var(--bg-subcard); border: 1.5px solid var(--accent-done); color: var(--accent-done); border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.84rem;">🎉 Все системы работают идеально</div>`
+      : `<div style="margin-top: 6px; padding: 10px; background: #FFF1F0; border: 1.5px solid #FFA39E; color: #CF1322; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.82rem;">Обнаружены проблемы в цепочке синхронизации</div>`;
+
+    render(finalBanner);
+    if (confirmBtn) {
+      confirmBtn.style.display = 'inline-flex';
+      confirmBtn.textContent = 'Понятно';
+    }
+
+    return msgEl.innerHTML;
   },
 
   cleanOldTombstones(tombstones) {

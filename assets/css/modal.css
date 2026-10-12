@@ -604,31 +604,83 @@ textarea.neo-input {
   line-height: 1.4;
 }
 
-/* Эстетичная карточка доната */
+/* ЭСТЕТИЧНАЯ КОФЕЙНАЯ КАРТОЧКА ДОНАТА */
 .donation-card {
   background-color: var(--bg-beige);
   border: var(--border-width) solid var(--border-color);
-  border-radius: 14px;
-  padding: 14px 16px;
+  border-radius: 16px;
+  padding: 12px 14px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   box-shadow: 2px 2px 0 var(--shadow-color);
-  margin-bottom: 2px;
 }
+
 [data-theme="dark"] .donation-card {
-  background-color: #3D2B24;
-  color: var(--ink-black);
+  background-color: #38241D;
+  border-color: var(--border-color);
 }
-.donation-text h3 {
+
+.donation-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background-color: var(--folder-amber);
+  border: var(--border-width) solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  box-shadow: 2px 2px 0 var(--shadow-color);
+}
+
+.donation-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.donation-title {
   font-family: var(--font-heading);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 700;
-  margin-bottom: 4px;
+  color: var(--ink-black);
+  line-height: 1.25;
 }
-.donation-text p {
-  font-size: 0.8rem;
+
+.donation-desc {
+  font-size: 0.76rem;
   line-height: 1.35;
   color: var(--ink-muted);
+}
+
+.donation-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+
+/* На экранах смартфонов кнопка не сжимает текст, а аккуратно встает снизу */
+@media (max-width: 420px) {
+  .donation-card {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .donation-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* Компактный отступ описаний в блоках меню */
+.backup-box-desc {
+  font-size: 0.78rem !important;
+  color: var(--ink-muted);
+  line-height: 1.35 !important;
+  margin-top: -2px;
 }

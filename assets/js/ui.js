@@ -966,7 +966,7 @@ palette: [
         <div class="task-item ${task.completed ? 'task-completed' : ''}" data-task-id="${safeTaskId}">
           <div class="task-main-row">
             <input type="checkbox" class="task-checkbox chk-focus-task" id="chk-${safeTaskId}" ${task.completed ? 'checked' : ''} aria-label="Отметить выполненной">
-            <label for="chk-${safeTaskId}" class="task-text">${safeTitle}</label>
+            <span class="task-text open-focus-task-modal" data-task-id="${safeTaskId}">${safeTitle}</span>
             <button class="task-star-btn unfocus-focus-btn" title="Убрать из фокуса дня" aria-label="Убрать из фокуса дня" data-unfocus-id="${safeTaskId}">⭐</button>
           </div>
           
@@ -988,6 +988,7 @@ palette: [
   },
 
   bindFocusEvents() {
+    // 1. Отметка задачи только по чекбоксу
     const checkboxes = this.focusList.querySelectorAll('.chk-focus-task');
     checkboxes.forEach(box => {
       box.addEventListener('change', (e) => {
@@ -1010,6 +1011,16 @@ palette: [
       });
     });
 
+    // 2. Клик по тексту открывает модалку задачи
+    const titles = this.focusList.querySelectorAll('.open-focus-task-modal');
+    titles.forEach(el => {
+      el.addEventListener('click', () => {
+        const taskId = el.getAttribute('data-task-id');
+        this.openTaskDetailModal(taskId);
+      });
+    });
+
+    // 3. Звездочка убирает из фокуса
     const starButtons = this.focusList.querySelectorAll('.unfocus-focus-btn');
     starButtons.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1021,6 +1032,7 @@ palette: [
       });
     });
 
+    // 4. Раскрытие чеклиста
     this.focusList.querySelectorAll('.inline-checklist-toggle').forEach(btn => {
       btn.addEventListener('click', () => {
         const bodyId = `chkbody-${btn.getAttribute('data-toggle-id')}`;
@@ -1036,6 +1048,7 @@ palette: [
       });
     });
 
+    // 5. Отметка подзадач
     this.focusList.querySelectorAll('.inline-subtask-chk').forEach(chk => {
       chk.addEventListener('change', (e) => {
         const taskId = chk.getAttribute('data-task-id');

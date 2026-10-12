@@ -192,102 +192,102 @@
 
   </div> <!-- закрытие .container -->
 
-  <!-- МОДАЛЬНОЕ ОКНО 1: Центр данных и Облачной синхронизации -->
+  <!-- МОДАЛЬНОЕ ОКНО 1: Меню и Настройки -->
   <div class="modal-overlay" id="backupModal" role="dialog" aria-modal="true" aria-labelledby="backupModalHeading">
     <div class="modal-card">
       <div class="modal-header">
         <div>
-          <h2 class="modal-title" id="backupModalHeading">⚙️ Настройки и Данные</h2>
-          <p style="font-size: 0.8rem; color: var(--ink-muted); margin-top: 2px;">Ваш персональный центр управления.</p>
+          <h2 class="modal-title" id="backupModalHeading">⚙️ Меню и Данные</h2>
+          <p style="font-size: 0.8rem; color: var(--ink-muted); margin-top: 2px;">Local-First • Данные на вашем устройстве</p>
         </div>
         <button class="modal-close-btn" id="closeBackupModalBtn" aria-label="Закрыть">✕</button>
       </div>
 
-      <!-- Блок Доната (Скрытая и эстетичная поддержка) -->
+      <!-- Эстетичная кофейная карточка доната -->
       <div class="donation-card">
-        <div class="donation-text">
-          <h3>Угостить автора кофе ☕</h3>
-          <p>Life OS бесплатна и не следит за вами. Если планер помогает вам, вы можете символически поддержать проект.</p>
+        <div class="donation-badge" aria-hidden="true">☕</div>
+        <div class="donation-info">
+          <div class="donation-title">Угостить автора кофе</div>
+          <div class="donation-desc">Планер полностью бесплатен. Если он помог разгрузить голову — можно поддержать проект.</div>
         </div>
-        <!-- Сюда потом вставишь ссылку вместо # -->
-        <a href="#" target="_blank" class="neo-btn neo-btn-sm" style="flex-shrink: 0; text-decoration: none;">Поддержать</a>
+        <a href="#" target="_blank" class="neo-btn neo-btn-sm donation-btn">Чаевые ↗</a>
       </div>
 
       <div class="backup-stats-pill">
-        <span>Память базы: <strong id="backupMemoryKb">0.0 КБ</strong></span>
+        <span>База: <strong id="backupMemoryKb">0.0 КБ</strong></span>
         <span id="cloudStatusBadge" style="color: var(--accent-done);">● 100% Локально</span>
       </div>
 
+      <!-- Секция: Облачная синхронизация -->
       <div class="backup-section-box">
         <div class="backup-box-title">
           <span>🟡 Яндекс Диск</span>
           <span id="yandexSyncLabel" class="sync-time-badge">Не подключен</span>
         </div>
-        <p class="backup-box-desc">Бесплатная и приватная синхронизация без серверов. Файл <code>planner_data.json</code> сохраняется в изолированную папку «Приложения/Life-OS» на вашем личном Диске.</p>
+        <p class="backup-box-desc">Приватная синхронизация через защищенную папку на вашем личном Диске.</p>
         
-        <!-- Состояние: НЕ подключено -->
+        <!-- Не подключено -->
         <div id="yandexNotConnectedBlock" style="display: flex; flex-direction: column; gap: 8px;">
           <button type="button" class="neo-btn neo-btn-primary" id="loginYandexBtn" style="width: 100%;">
-            ⚡ Войти через Яндекс ID (в 1 клик)
+            ⚡ Войти через Яндекс ID
           </button>
           <div style="display: flex; gap: 6px;">
             <button type="button" class="neo-btn neo-btn-sm" id="manualYandexTokenBtn" style="flex: 1;">
               🔑 Ввести токен
             </button>
-            <button type="button" class="neo-btn neo-btn-sm" id="diagYandexBtn" style="flex: 1;" title="Проверить каждый шаг соединения">
+            <button type="button" class="neo-btn neo-btn-sm" id="diagYandexBtn" style="flex: 1;" title="Проверить связь">
               🔍 Диагностика
             </button>
           </div>
         </div>
 
-        <!-- Состояние: ПОДКЛЮЧЕНО -->
+        <!-- Подключено -->
         <div id="yandexConnectedBlock" style="display: none; flex-direction: column; gap: 8px;">
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 8px;">
             <button type="button" class="neo-btn neo-btn-primary neo-btn-sm" id="syncYandexNowBtn" style="flex: 1;">
-              Синхронизировать сейчас 🔄
+              Синхронизировать 🔄
             </button>
-            <button type="button" class="neo-btn neo-btn-sm" id="unlinkYandexBtn" style="color: #CF1322;" title="Отвязать токен">
+            <button type="button" class="neo-btn neo-btn-sm" id="unlinkYandexBtn" style="color: #CF1322;" title="Отвязать">
               Отключить
             </button>
           </div>
           <button type="button" class="neo-btn neo-btn-sm" id="diagYandexConnectedBtn" style="width: 100%;">
-            🔍 Диагностика связи с облаком
+            🔍 Проверить статус связи
           </button>
         </div>
       </div>
 
+      <!-- Секция: Резервная копия (Файл) -->
       <div class="backup-section-box">
-        <h3 class="backup-box-title">📥 Скачать бэкап (.json)</h3>
-        <p class="backup-box-desc">Мгновенный экспорт всех сфер, проектов и мыслей в один независимый файл.</p>
-        <button type="button" class="neo-btn neo-btn-primary" id="downloadBackupBtn" style="width: 100%;">
-          Скачать файл резервной копии
-        </button>
-      </div>
-
-      <div class="backup-section-box">
-        <h3 class="backup-box-title">📤 Восстановить из файла</h3>
-        <p class="backup-box-desc">Выберите файл для восстановления. Умное слияние объединит задачи с разных устройств без потерь.</p>
+        <div class="backup-box-title">
+          <span>📦 Файл резервной копии</span>
+        </div>
+        <p class="backup-box-desc">Сохраните файл на диск или восстановите данные с другого устройства.</p>
         
-        <div class="merge-mode-selector">
-          <button type="button" class="merge-mode-btn active" id="modeMergeBtn" title="Объединит новые задачи без потерь">
-            ⚡ Умное слияние (Smart Merge)
-          </button>
-          <button type="button" class="merge-mode-btn" id="modeOverwriteBtn" title="Полностью заменит текущие задачи">
-            Перезаписать всё
-          </button>
-        </div>
-
-        <input type="file" id="backupFileInput" accept=".json" style="display: none;">
-        <div class="file-drop-zone" id="fileDropZone">
-          <span style="font-weight: 700; font-size: 0.88rem;">Нажмите, чтобы выбрать файл .json</span>
-        </div>
-      </div>
-
-      <div style="margin-top: 6px;">
-        <button type="button" class="neo-btn" id="resetAllDataBtn" style="width: 100%; color: #CF1322; border-color: #CF1322;">
-          🗑️ Очистить все данные (Сбросить до нуля)
+        <button type="button" class="neo-btn neo-btn-sm" id="downloadBackupBtn" style="width: 100%;">
+          📥 Скачать бэкап (.json)
         </button>
+
+        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+          <div class="merge-mode-selector">
+            <button type="button" class="merge-mode-btn active" id="modeMergeBtn" title="Объединит без потерь">
+              ⚡ Умное слияние
+            </button>
+            <button type="button" class="merge-mode-btn" id="modeOverwriteBtn" title="Перезапишет текущую базу">
+              Перезапись
+            </button>
+          </div>
+
+          <input type="file" id="backupFileInput" accept=".json" style="display: none;">
+          <div class="file-drop-zone" id="fileDropZone">
+            <span style="font-weight: 700; font-size: 0.84rem;">📤 Нажмите, чтобы выбрать файл .json</span>
+          </div>
+        </div>
       </div>
+
+      <button type="button" class="neo-btn neo-btn-sm" id="resetAllDataBtn" style="width: 100%; color: #CF1322; border-color: #CF1322; margin-top: 2px;">
+        🗑️ Сбросить все данные
+      </button>
     </div>
   </div>
 

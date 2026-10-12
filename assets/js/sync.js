@@ -71,50 +71,96 @@ window.LifeSync = {
   },
 
   async runDiagnostic() {
-    let html = `<div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem;">`;
+    let html = `<div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.88rem; text-align: left;">`;
     
-    const addStep = (status, text) => {
-      const icon = status === 'ok' ? '✅' : (status === 'error' ? '❌' : '⏳');
-      html += `<div style="display: flex; gap: 8px; align-items: flex-start;">
-                 <span>${icon}</span>
-                 <span style="color: ${status === 'error' ? '#CF1322' : 'var(--ink-black)'}">${text}</span>
-               </div>`;
+    const addStep = (status, title, desc = '') => {
+      const icon = status === 'ok' ? '✅' : (status === 'error' ? '❌' : 'ℹ️');
+      const titleColor = status === 'error' ? '#CF1322' : 'var(--ink-black)';
+      html += `
+        <div style="display: flex; gap: 10px; align-items: flex-start; background: var(--bg-card); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <span style="font-size: 1.1rem; line-height: 1.2;">${icon}</span>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <strong style="color: ${titleColor};">${title}</strong>
+            ${desc ? `<span style="font-size: 0.78rem; color: var(--ink-muted); line-height: 1.3;">${desc}</span>` : ''}
+          </div>
+        </div>`;
     };
 
+    // 1. Проверка токена
     if (!this.yandexToken) {
-      addStep('error', 'Токен авторизации не найден. Выполните вход.');
+      addStep('error', 'Токен авторизации не найден', 'Сначала выполните вход через Яндекс ID.');
       return html + '</div>';
     }
+    addStep('ok', 'Токен Яндекс ID найден', 'Ключ авторизации сохранен на устройстве.');
 
-    addStep('ok', 'Токен авторизации найден.');
-
+    // 2. Проверка доступа к Яндекс Диску (сервера Яндекса)
+    let downloadHref = null;
     try {
       const appRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources?path=app:/', {
         headers: { Authorization: `OAuth ${this.yandexToken}` }
       });
-      if (!appRes.ok) throw new Error();
-      addStep('ok', 'Доступ к изолированной папке приложения (app:/) открыт.');
+      if (!appRes.ok) throw new Error(`HTTP ${appRes.status}`);
+      addStep('ok', 'Связь с серверами Яндекса есть', 'Папка приложения app:/ доступна.');
     } catch (e) {
-      addStep('error', 'Нет доступа к папке приложения. Возможно, токен устарел.');
+      addStep('error', 'Сбой доступа к Яндекс Диску', 'Возможно, токен устарел. Попробуйте войти заново.');
       return html + '</div>';
     }
 
+    // 3. Получение метаданных файла
+    try {
+      const downMetaRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/download?path=app:/planner_data.json', {
+        headers: { Authorization: `OAuth ${this.yandexToken}` }
+      });
+      if (downMetaRes.status === 404) {
+        addStep('info', 'Файл базы в облаке еще не создан', 'Это нормально, если синхронизация запускается впервые.');
+      } else if (downMetaRes.ok) {
+        const meta = await downMetaRes.json();
+        downloadHref = meta.href;
+        addStep('ok', 'Файл базы найден на Диске', 'Ссылка на чтение данных успешно получена.');
+      }
+    } catch (e) {
+      addStep('error', 'Ошибка получения ссылки на файл', e.message);
+    }
+
+    // 4. НАСТОЯЩИЙ ТЕСТ ПРОКСИ-ШЛЮЗА CLOUDFLARE (Проверка блокировки РКН / VPN)
+    if (downloadHref) {
+      try {
+        const json = await this.downloadFile(downloadHref);
+        addStep('ok', 'Прокси-шлюз Cloudflare работает', `Данные успешно прочитаны через шлюз. Задач в облаке: ${(json.tasks || []).length}`);
+      } catch (e) {
+        addStep('error', 'Шлюз Cloudflare заблокирован (Нужен VPN)', 'Домен workers.dev заблокирован провайдерами РФ. Включите VPN или привяжите свой домен к Worker.');
+        html += `<div style="margin-top: 6px; padding: 8px; background: #FFF1F0; color: #CF1322; border-radius: 8px; font-weight: 700; text-align: center; font-size: 0.8rem; border: 1px solid #FFA39E;">Синхронизация невозможна без VPN из-за блокировки шлюза</div></div>`;
+        return html;
+      }
+    } else {
+      // Если файла еще нет, тестируем сам шлюз тестовым запросом
+      try {
+        const proxyUrl = window.LifeConfig.network.proxyUrl;
+        const testRes = await fetch(`${proxyUrl}?url=${encodeURIComponent('https://yandex.ru')}`);
+        if (!testRes.ok && testRes.status !== 200) throw new Error();
+        addStep('ok', 'Прокси-шлюз Cloudflare доступен', 'Соединение со шлюзом прошло проверку.');
+      } catch (e) {
+        addStep('error', 'Шлюз Cloudflare недоступен (Нужен VPN)', 'Домен workers.dev заблокирован в РФ. Включите VPN.');
+        html += `<div style="margin-top: 6px; padding: 8px; background: #FFF1F0; color: #CF1322; border-radius: 8px; font-weight: 700; text-align: center; font-size: 0.8rem; border: 1px solid #FFA39E;">Синхронизация невозможна без VPN из-за блокировки шлюза</div></div>`;
+        return html;
+      }
+    }
+
+    // 5. Проверка прав на запись
     try {
       const upMetaRes = await fetch('https://cloud-api.yandex.net/v1/disk/resources/upload?path=app:/planner_data.json&overwrite=true', {
         headers: { Authorization: `OAuth ${this.yandexToken}` }
       });
       if (upMetaRes.ok) {
-        addStep('ok', 'Права на запись в облако подтверждены.');
+        addStep('ok', 'Права на запись в облако подтверждены', 'Яндекс готов сохранять изменения.');
       } else {
         throw new Error();
       }
     } catch (e) {
-      addStep('error', 'Яндекс отклонил запрос на запись файла.');
+      addStep('error', 'Яндекс отклонил запрос на запись', 'Проверьте свободное место на Диске.');
     }
 
-    addStep('ok', 'Сетевой прокси-шлюз Cloudflare подключен.');
-    
-    html += `<div style="margin-top: 8px; padding: 8px; background: var(--bg-subcard); border-radius: 8px; font-weight: 600; text-align: center;">Диагностика успешно завершена</div></div>`;
+    html += `<div style="margin-top: 6px; padding: 8px; background: var(--bg-subcard); border-radius: 8px; font-weight: 700; text-align: center; font-size: 0.82rem;">Все системы работают штатно</div></div>`;
     return html;
   },
 

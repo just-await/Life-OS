@@ -65,12 +65,16 @@
     <!-- ЭКРАН 1: ДЭШБОРД (ФОКУС ДНЯ + КАРТОТЕКА СФЕР) -->
     <main id="viewDashboard" class="view-screen active">
       
-      <!-- Фокус дня -->
+      <!-- Фокус дня и Горизонт 7 дней -->
       <section class="neo-card focus-section">
         <div class="section-title focus-title-bar">
-          <div class="focus-title-left">
-            <span>⭐ Фокус дня</span>
-            <span id="focusRatioLabel" class="focus-ratio-badge">0/0</span>
+          <div class="focus-tabs-group" role="tablist">
+            <button type="button" class="focus-tab-btn active" id="tabFocusToday" role="tab" aria-selected="true">
+              ⭐ Сегодня <span id="focusRatioLabel" class="focus-ratio-badge">0/0</span>
+            </button>
+            <button type="button" class="focus-tab-btn" id="tabFocusWeek" role="tab" aria-selected="false">
+              🗓️ 7 дней <span id="weekRatioLabel" class="focus-ratio-badge">0</span>
+            </button>
           </div>
           <button class="neo-btn neo-btn-sm clear-focus-btn" id="clearCompletedFocusBtn" style="display: none;" title="Убрать выполненные из фокуса">
             🧹 Очистить
@@ -81,7 +85,11 @@
           <div class="progress-bar-fill" id="focusProgressFill" style="width: 0%;"></div>
         </div>
 
+        <!-- Список задач на Сегодня -->
         <div class="focus-list" id="focusList"></div>
+
+        <!-- Список задач на 7 дней (по умолчанию скрыт) -->
+        <div class="focus-list" id="weekList" style="display: none;"></div>
       </section>
 
       <!-- Картотека сфер -->
@@ -407,9 +415,18 @@
           <span class="form-label" style="margin: 0;">Добавить свойство:</span>
           <div class="prop-btns-group">
             <button type="button" class="neo-btn neo-btn-sm" id="propBtnDeadline">+ 📅 Дедлайн</button>
+            <button type="button" class="neo-btn neo-btn-sm" id="propBtnWeek">+ 🗓️ На неделю</button>
             <button type="button" class="neo-btn neo-btn-sm" id="propBtnChecklist">+ ☑️ Чеклист</button>
             <button type="button" class="neo-btn neo-btn-sm" id="propBtnNote">+ 📝 Заметка</button>
           </div>
+        </div>
+
+        <div class="dynamic-prop-box" id="propBoxWeek" style="display: none;">
+          <div class="prop-box-header">
+            <span class="prop-box-title">🗓️ В планах на 7 дней</span>
+            <button type="button" class="prop-remove-btn" id="removeWeekBtn">Убрать ✕</button>
+          </div>
+          <span style="font-size: 0.78rem; color: var(--ink-muted);">Задача будет отображаться во вкладке «7 дней» даже без дедлайна.</span>
         </div>
 
         <div class="dynamic-prop-box" id="propBoxDeadline" style="display: none;">

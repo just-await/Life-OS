@@ -179,6 +179,10 @@ palette: [
     this.viewProject = document.getElementById('viewProject');
 
     this.focusList = document.getElementById('focusList');
+    this.weekList = document.getElementById('weekList');
+    this.tabFocusToday = document.getElementById('tabFocusToday');
+    this.tabFocusWeek = document.getElementById('tabFocusWeek');
+    this.weekRatioLabel = document.getElementById('weekRatioLabel');
     this.focusProgressFill = document.getElementById('focusProgressFill');
     this.focusRatioLabel = document.getElementById('focusRatioLabel');
     this.clearCompletedFocusBtn = document.getElementById('clearCompletedFocusBtn');
@@ -232,6 +236,9 @@ palette: [
     this.deleteTaskBtn = document.getElementById('deleteTaskBtn');
 
     this.propBtnDeadline = document.getElementById('propBtnDeadline');
+    this.propBtnWeek = document.getElementById('propBtnWeek');
+    this.propBoxWeek = document.getElementById('propBoxWeek');
+    this.removeWeekBtn = document.getElementById('removeWeekBtn');
     this.propBtnChecklist = document.getElementById('propBtnChecklist');
     this.propBtnNote = document.getElementById('propBtnNote');
     this.propBoxDeadline = document.getElementById('propBoxDeadline');
@@ -845,6 +852,11 @@ palette: [
     this.detailTaskTitle.value = task.title;
     this.currentEditingChecklist = JSON.parse(JSON.stringify(task.checklist || []));
 
+    // Свойство: На неделю
+    if (this.propBoxWeek) {
+      this.propBoxWeek.style.display = task.inWeek ? 'flex' : 'none';
+    }
+
     if (task.deadline) {
       this.propBoxDeadline.style.display = 'flex';
       this.detailTaskDeadline.value = task.deadline;
@@ -1056,6 +1068,175 @@ palette: [
     });
 
     this.focusList.querySelectorAll('.inline-subtask-chk').forEach(chk => {
+      chk.addEventListener('change', (e) => {
+        const taskId = chk.getAttribute('data-task-id');
+        const idx = chk.getAttribute('data-sub-idx');
+        const task = window.LifeState.getTask(taskId);
+        if (task && task.checklist && task.checklist[idx]) {
+          task.checklist[idx].completed = chk.checked;
+          task.updatedAt = Date.now();
+          window.LifeStorage.save(window.LifeState.data);
+          if (window.LifeConfig) window.LifeConfig.vibrate(20);
+          this.renderFocusTasks();
+          if (window.LifeSync) window.LifeSync.triggerAutoSync();
+        }
+      });
+    });
+  },
+
+  renderWeekTasks() {
+    if (!this.weekList) return;
+    const weekTasks = window.LifeState.getWeekTasks();
+
+    if (this.weekRatioLabel) {
+      this.weekRatioLabel.textContent = weekTasks.length;
+    }
+
+    if (weekTasks.length === 0) {
+      this.weekList.innerHTML = `
+        <div class="focus-empty-state">
+          🗓️ На ближайшие 7 дней задач нет. Полный штиль и свобода!
+        </div>
+      `;
+      return;
+    }
+
+    this.weekList.innerHTML = weekTasks.map(task => {
+      const safeTitle = this.escapeHtml(task.title);
+      const safeProject = this.escapeHtml(task.projectName);
+      const sphereColor = this.safeColor(task.sphereColor);
+      const safeTaskId = this.safeId(task.id);
+
+      let badgesHtml = '';
+      if (task.isOverdue) {
+        badgesHtml += `<span class="task-property-badge" style="background: #3B241C; color: #FFA39E; border-color: #CF1322;">⚠️ Срок прошел (${this.formatDate(task.deadline)})</span>`;
+      } else if (task.isDueToday) {
+        badgesHtml += `<span class="task-property-badge" style="background: var(--folder-amber); color: #141414;">🔥 Сегодня</span>`;
+      } else if (task.deadline) {
+        badgesHtml += `<span class="task-property-badge">📅 ${this.formatDate(task.deadline)}</span>`;
+      } else if (task.inWeek) {
+        badgesHtml += `<span class="task-property-badge">🗓️ В планах недели</span>`;
+      }
+
+      if (task.note && task.note.trim()) {
+        badgesHtml += `<span class="task-property-badge">📝</span>`;
+      }
+
+      let inlineChecklistHtml = '';
+      if (task.checklist && task.checklist.length > 0) {
+        const done = task.checklist.filter(s => s.completed).length;
+        const total = task.checklist.length;
+        const toggleKey = `wk-${safeTaskId}`;
+        const isOpen = this.openChecklistIds && this.openChecklistIds.has(toggleKey);
+
+        const listItems = task.checklist.map((c, idx) => `
+          <div class="inline-subtask-row ${c.completed ? 'completed' : ''}">
+            <input type="checkbox" class="task-checkbox inline-subtask-chk" data-task-id="${safeTaskId}" data-sub-idx="${idx}" ${c.completed ? 'checked' : ''} style="width:18px;height:18px;min-width:18px;min-height:18px;">
+            <span>${this.escapeHtml(c.text)}</span>
+          </div>
+        `).join('');
+
+        inlineChecklistHtml = `
+          <div class="inline-checklist-wrap" style="width:100%;">
+            <button class="inline-checklist-toggle" data-toggle-id="${toggleKey}">
+              ☑️ Подзадачи (${done}/${total}) <span class="chevron">${isOpen ? '▲' : '▼'}</span>
+            </button>
+            <div class="inline-checklist-body" id="chkbody-${toggleKey}" style="display: ${isOpen ? 'flex' : 'none'};">
+              ${listItems}
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="task-item" data-task-id="${safeTaskId}">
+          <div class="task-main-row">
+            <input type="checkbox" class="task-checkbox chk-week-task" id="chk-wk-${safeTaskId}" aria-label="Выполнить задачу">
+            <span class="task-text open-week-task-modal" data-task-id="${safeTaskId}">${safeTitle}</span>
+            <button class="task-star-btn toggle-week-focus-btn" title="${task.inFocus ? 'Уже в фокусе сегодня' : 'Взять в фокус сегодня'}" data-task-id="${safeTaskId}">
+              ${task.inFocus ? '⭐' : '☆'}
+            </button>
+          </div>
+          
+          <div class="task-footer-row">
+            <div class="task-badges-left">
+              ${badgesHtml}
+            </div>
+            <span class="tag-project">
+              <span class="tag-dot" style="background-color: ${sphereColor};"></span>
+              ${safeProject}
+            </span>
+          </div>
+          ${inlineChecklistHtml}
+        </div>
+      `;
+    }).join('');
+
+    this.bindWeekEvents();
+  },
+
+  bindWeekEvents() {
+    // 1. Выполнение задачи из списка недели
+    const checkboxes = this.weekList.querySelectorAll('.chk-week-task');
+    checkboxes.forEach(box => {
+      box.addEventListener('change', (e) => {
+        const taskId = e.target.id.replace('chk-wk-', '');
+        const updatedTask = window.LifeState.toggleTaskCompleted(taskId);
+
+        if (updatedTask && updatedTask.completed) {
+          if (window.LifeConfig) window.LifeConfig.vibrate(40);
+          if (window.LifeConfetti) {
+            const rect = e.target.getBoundingClientRect();
+            window.LifeConfetti.shoot(rect.left + rect.width / 2, rect.top + rect.height / 2);
+          }
+        }
+
+        this.renderFocusTasks();
+        this.renderSpheres();
+        if (window.LifeSync) window.LifeSync.triggerAutoSync();
+      });
+    });
+
+    // 2. Открытие карточки задачи
+    const titles = this.weekList.querySelectorAll('.open-week-task-modal');
+    titles.forEach(el => {
+      el.addEventListener('click', () => {
+        const taskId = el.getAttribute('data-task-id');
+        this.openTaskDetailModal(taskId);
+      });
+    });
+
+    // 3. Звездочка: взять задачу недели прямо в Сегодня!
+    const starButtons = this.weekList.querySelectorAll('.toggle-week-focus-btn');
+    starButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const taskId = btn.getAttribute('data-task-id');
+        window.LifeState.toggleTaskFocus(taskId);
+        if (window.LifeConfig) window.LifeConfig.vibrate(20);
+        this.renderFocusTasks();
+        if (window.LifeSync) window.LifeSync.triggerAutoSync();
+      });
+    });
+
+    // 4. Аккордеоны подзадач
+    this.weekList.querySelectorAll('.inline-checklist-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const toggleKey = btn.getAttribute('data-toggle-id');
+        const body = document.getElementById(`chkbody-${toggleKey}`);
+        const chev = btn.querySelector('.chevron');
+        if (body.style.display === 'none') {
+          body.style.display = 'flex';
+          chev.textContent = '▲';
+          this.openChecklistIds.add(toggleKey);
+        } else {
+          body.style.display = 'none';
+          chev.textContent = '▼';
+          this.openChecklistIds.delete(toggleKey);
+        }
+      });
+    });
+
+    this.weekList.querySelectorAll('.inline-subtask-chk').forEach(chk => {
       chk.addEventListener('change', (e) => {
         const taskId = chk.getAttribute('data-task-id');
         const idx = chk.getAttribute('data-sub-idx');
@@ -1815,6 +1996,46 @@ palette: [
       this.detailTaskDeadline.value = '';
     });
 
+    // Переключение табов: Сегодня / 7 дней
+    if (this.tabFocusToday && this.tabFocusWeek) {
+      this.tabFocusToday.addEventListener('click', () => {
+        this.tabFocusToday.classList.add('active');
+        this.tabFocusToday.setAttribute('aria-selected', 'true');
+        this.tabFocusWeek.classList.remove('active');
+        this.tabFocusWeek.setAttribute('aria-selected', 'false');
+        this.focusList.style.display = 'flex';
+        this.weekList.style.display = 'none';
+        if (this.clearCompletedFocusBtn) {
+          const tasks = window.LifeState.getFocusTasks();
+          const hasDone = tasks.some(t => t.completed);
+          this.clearCompletedFocusBtn.style.display = hasDone ? 'inline-flex' : 'none';
+        }
+      });
+
+      this.tabFocusWeek.addEventListener('click', () => {
+        this.tabFocusWeek.classList.add('active');
+        this.tabFocusWeek.setAttribute('aria-selected', 'true');
+        this.tabFocusToday.classList.remove('active');
+        this.tabFocusToday.setAttribute('aria-selected', 'false');
+        this.focusList.style.display = 'none';
+        this.weekList.style.display = 'flex';
+        if (this.clearCompletedFocusBtn) this.clearCompletedFocusBtn.style.display = 'none';
+        this.renderWeekTasks();
+      });
+    }
+
+    // Обработчик свойства "На неделю" в карточке задачи
+    if (this.propBtnWeek) {
+      this.propBtnWeek.addEventListener('click', () => {
+        this.propBoxWeek.style.display = 'flex';
+      });
+    }
+    if (this.removeWeekBtn) {
+      this.removeWeekBtn.addEventListener('click', () => {
+        this.propBoxWeek.style.display = 'none';
+      });
+    }
+
     this.propBtnChecklist.addEventListener('click', () => {
       this.propBoxChecklist.style.display = 'flex';
       this.newSubtaskInput.focus();
@@ -1855,11 +2076,12 @@ palette: [
       const taskId = this.detailTaskId.value;
       const title = this.detailTaskTitle.value.trim();
       const deadline = this.propBoxDeadline.style.display !== 'none' ? this.detailTaskDeadline.value : null;
+      const inWeek = this.propBoxWeek && this.propBoxWeek.style.display !== 'none';
       const note = this.propBoxNote.style.display !== 'none' ? this.detailTaskNote.value.trim() : '';
       const checklist = this.propBoxChecklist.style.display !== 'none' ? this.currentEditingChecklist : [];
 
       if (taskId && title) {
-        window.LifeState.updateTask(taskId, { title, deadline, note, checklist });
+        window.LifeState.updateTask(taskId, { title, deadline, inWeek, note, checklist });
         this.taskDetailModal.classList.remove('active');
         if (window.LifeState.activeProjectId) this.renderProjectTasks();
         this.renderFocusTasks();

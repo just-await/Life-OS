@@ -162,7 +162,7 @@ window.LifeState = {
     return (this.data.tasks || []).find(t => t.id === taskId);
   },
 
-  addTask({ projectId, title, deadline = null }) {
+  addTask({ projectId, title, deadline = null, inWeek = false }) {
     if (!title || !title.trim()) return null;
 
     const newTask = {
@@ -172,6 +172,8 @@ window.LifeState = {
       completed: false,
       completedAt: null,
       inFocus: false,
+      focusedAt: null,
+      inWeek: Boolean(inWeek),
       deadline: deadline,
       checklist: [],
       note: '',
@@ -180,7 +182,7 @@ window.LifeState = {
       updatedAt: Date.now()
     };
 
-    this.data.tasks.unshift(newTask); // Добавляем на первое место
+    this.data.tasks.unshift(newTask);
     window.LifeStorage.save(this.data);
     return newTask;
   },
@@ -219,11 +221,13 @@ window.LifeState = {
 
     if (task.inFocus || task.deadline === todayStr) {
       task.inFocus = false;
+      task.focusedAt = null;
       if (task.deadline === todayStr) {
         task.unfocusedDate = todayStr;
       }
     } else {
       task.inFocus = true;
+      task.focusedAt = Date.now(); // Фиксируем точное время входа в фокус
       task.unfocusedDate = null;
     }
 
@@ -236,15 +240,32 @@ window.LifeState = {
   getFocusTasks() {
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-    // АВТО-ОЧИСТКА В ПОЛНОЧЬ: задачи, закрытые во вчерашние дни, аккуратно убираются из фокуса
     let modified = false;
     (this.data.tasks || []).forEach(t => {
+      // 1. Очистка выполненных вчера дел
       if (t.inFocus && t.completed && t.completedAt) {
         const compDate = new Date(t.completedAt);
         const compDateStr = `${compDate.getFullYear()}-${String(compDate.getMonth() + 1).padStart(2, '0')}-${String(compDate.getDate()).padStart(2, '0')}`;
         if (compDateStr < todayStr) {
           t.inFocus = false;
+          t.focusedAt = null;
+          t.updatedAt = Date.now();
+          modified = true;
+        }
+      }
+
+      // 2. ЗАБОТЛИВЫЙ АВТО-ВОЗВРАТ НА 4-Й ДЕНЬ (если дело не сделано за 3 дня)
+      if (t.inFocus && !t.completed) {
+        const focusedTime = t.focusedAt || t.createdAt || Date.now();
+        const fDate = new Date(focusedTime);
+        const focusedMidnight = new Date(fDate.getFullYear(), fDate.getMonth(), fDate.getDate()).getTime();
+        const daysDiff = Math.floor((todayMidnight - focusedMidnight) / (24 * 60 * 60 * 1000));
+
+        if (daysDiff >= 4) {
+          t.inFocus = false; // Мягко возвращаем в родной проект
+          t.focusedAt = null;
           t.updatedAt = Date.now();
           modified = true;
         }
@@ -265,9 +286,67 @@ window.LifeState = {
       const sphere = project ? (this.data.spheres || []).find(s => s.id === project.sphereId) : null;
       const isDueToday = t.deadline === todayStr;
 
+      // Мягкий бейдж давности (Вчера / 2 дня / 3 дня)
+      let rolloverText = null;
+      if (!t.completed) {
+        const focusedTime = t.focusedAt || t.createdAt || Date.now();
+        const fDate = new Date(focusedTime);
+        const focusedMidnight = new Date(fDate.getFullYear(), fDate.getMonth(), fDate.getDate()).getTime();
+        const daysDiff = Math.floor((todayMidnight - focusedMidnight) / (24 * 60 * 60 * 1000));
+        if (daysDiff === 1) rolloverText = 'Вчера';
+        else if (daysDiff === 2) rolloverText = '2 дня';
+        else if (daysDiff === 3) rolloverText = '3 дня';
+      }
+
       return {
         ...t,
         isDueToday: isDueToday,
+        rolloverText: rolloverText,
+        projectName: project ? project.title : 'Общее',
+        sphereTitle: sphere ? sphere.title : '',
+        sphereColor: sphere ? sphere.color : '#FFD027'
+      };
+    });
+  },
+
+  // СКОЛЬЗЯЩИЙ ГОРИЗОНТ: БЛИЖАЙШИЕ 7 ДНЕЙ (Сегодня + 6 дней)
+  getWeekTasks() {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    
+    const horizonDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6);
+    const horizonStr = `${horizonDate.getFullYear()}-${String(horizonDate.getMonth() + 1).padStart(2, '0')}-${String(horizonDate.getDate()).padStart(2, '0')}`;
+
+    const tasks = (this.data.tasks || []).filter(t => {
+      if (t.completed) return false; // Завершенные не загромождают горизонт
+
+      const hasDeadlineInHorizon = t.deadline && t.deadline >= todayStr && t.deadline <= horizonStr;
+      const isOverdue = t.deadline && t.deadline < todayStr;
+      const isManualWeek = Boolean(t.inWeek);
+      const isInFocus = Boolean(t.inFocus);
+
+      return hasDeadlineInHorizon || isOverdue || isManualWeek || isInFocus;
+    });
+
+    // Сортировка: просроченные сверху, затем по дате дедлайна
+    tasks.sort((a, b) => {
+      if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline);
+      if (a.deadline && !b.deadline) return -1;
+      if (!a.deadline && b.deadline) return 1;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+
+    return tasks.map(t => {
+      const project = (this.data.projects || []).find(p => p.id === t.projectId);
+      const sphere = project ? (this.data.spheres || []).find(s => s.id === project.sphereId) : null;
+      
+      const isDueToday = t.deadline === todayStr;
+      const isOverdue = t.deadline && t.deadline < todayStr;
+
+      return {
+        ...t,
+        isDueToday: isDueToday,
+        isOverdue: isOverdue,
         projectName: project ? project.title : 'Общее',
         sphereTitle: sphere ? sphere.title : '',
         sphereColor: sphere ? sphere.color : '#FFD027'

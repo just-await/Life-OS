@@ -54,8 +54,8 @@ window.LifeSync = {
   },
 
   // ЧИСТОЕ СКАЧИВАНИЕ ЧЕРЕЗ ВАШ ПЕРСОНАЛЬНЫЙ ШЛЮЗ
-  // Вспомогательный метод быстрых сетевых запросов с защитой от 30-секундных зависаний
-  async fetchWithTimeout(url, options = {}, timeoutMs = 4500) {
+  // Вспомогательный метод сетевых запросов с оптимальным таймаутом (8.5 сек)
+  async fetchWithTimeout(url, options = {}, timeoutMs = 8500) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -71,25 +71,25 @@ window.LifeSync = {
     }
   },
 
-  // ЧИСТОЕ И БЫСТРОЕ СКАЧИВАНИЕ ЧЕРЕЗ ШЛЮЗ
+  // ЧИСТОЕ СКАЧИВАНИЕ ЧЕРЕЗ ШЛЮЗ
   async downloadFile(downloadHref) {
-    // 1. Сначала пробуем скачать напрямую с Яндекса (быстрый таймаут 2.5 сек)
+    // 1. Сначала пробуем прямое скачивание
     try {
-      const directRes = await this.fetchWithTimeout(downloadHref, {}, 2500);
+      const directRes = await this.fetchWithTimeout(downloadHref, {}, 3000);
       if (directRes.ok) return await directRes.json();
     } catch (_) {}
 
-    // 2. Если браузер заблокировал прямой CORS — скачиваем через личный Worker
+    // 2. Если прямой доступ заблокирован — идем через защищенный Worker
     const proxyUrl = window.LifeConfig.network.proxyUrl;
     if (proxyUrl && !proxyUrl.includes('ваше-имя')) {
       try {
-        // Таймаут 4.5 сек вместо 30-секундного зависания при блокировках ТСПУ
-        const proxyRes = await this.fetchWithTimeout(`${proxyUrl}?url=${encodeURIComponent(downloadHref)}`, {}, 4500);
+        // Даем перегруженному Яндексу до 8.5 секунд на ответ
+        const proxyRes = await this.fetchWithTimeout(`${proxyUrl}?url=${encodeURIComponent(downloadHref)}`, {}, 8500);
         if (proxyRes.ok) return await proxyRes.json();
         throw new Error(`HTTP ${proxyRes.status}`);
       } catch (err) {
         if (err.message === 'TIMEOUT' || err.name === 'AbortError') {
-          throw new Error('Шлюз заблокирован провайдером (таймаут ответа)');
+          throw new Error('Шлюз заблокирован провайдером или Яндекс не ответил вовремя');
         }
         throw new Error(`Ошибка шлюза (${err.message})`);
       }

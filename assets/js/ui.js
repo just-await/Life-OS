@@ -922,90 +922,97 @@ palette: [
     if (tasks.length === 0) {
       this.focusList.innerHTML = `
         <div class="focus-empty-state">
-          ☕ Все дела на сегодня сделаны или ещё не выбраны. Загляните в проекты или просто отдохните!
+          ☕ Все дела на сегодня сделаны или ещё не выбраны. Загляните в планы на 7 дней или отдохните!
         </div>
       `;
       if (this.focusProgressFill) this.focusProgressFill.style.width = '0%';
       if (this.focusRatioLabel) this.focusRatioLabel.textContent = '0/0';
       if (this.clearCompletedFocusBtn) this.clearCompletedFocusBtn.style.display = 'none';
-      return;
-    }
+    } else {
+      const completedCount = tasks.filter(t => t.completed).length;
+      const percent = Math.round((completedCount / tasks.length) * 100);
 
-    const completedCount = tasks.filter(t => t.completed).length;
-    const percent = Math.round((completedCount / tasks.length) * 100);
-
-    if (this.focusProgressFill) this.focusProgressFill.style.width = `${percent}%`;
-    if (this.focusRatioLabel) this.focusRatioLabel.textContent = `${completedCount}/${tasks.length}`;
-
-    if (this.clearCompletedFocusBtn) {
-      this.clearCompletedFocusBtn.style.display = completedCount > 0 ? 'inline-flex' : 'none';
-    }
-
-    this.focusList.innerHTML = tasks.map(task => {
-      const safeTitle = this.escapeHtml(task.title);
-      const safeProject = this.escapeHtml(task.projectName);
-      const sphereColor = this.safeColor(task.sphereColor);
-      const safeTaskId = this.safeId(task.id);
-
-      let badgesHtml = '';
-      if (task.isDueToday) {
-        badgesHtml += `<span class="task-property-badge" style="background: var(--folder-amber); color: #141414;">🔥 Сегодня</span>`;
-      } else if (task.deadline) {
-        badgesHtml += `<span class="task-property-badge">📅 ${this.formatDate(task.deadline)}</span>`;
-      }
-      if (task.note && task.note.trim()) {
-        badgesHtml += `<span class="task-property-badge">📝</span>`;
+      if (this.focusProgressFill) this.focusProgressFill.style.width = `${percent}%`;
+      if (this.focusRatioLabel) this.focusRatioLabel.textContent = `${completedCount}/${tasks.length}`;
+      if (this.clearCompletedFocusBtn) {
+        this.clearCompletedFocusBtn.style.display = completedCount > 0 ? 'inline-flex' : 'none';
       }
 
-      let inlineChecklistHtml = '';
-      if (task.checklist && task.checklist.length > 0) {
-        const done = task.checklist.filter(s => s.completed).length;
-        const total = task.checklist.length;
-        const toggleKey = `foc-${safeTaskId}`;
-        const isOpen = this.openChecklistIds && this.openChecklistIds.has(toggleKey);
+      this.focusList.innerHTML = tasks.map(task => {
+        const safeTitle = this.escapeHtml(task.title);
+        const safeProject = this.escapeHtml(task.projectName);
+        const sphereColor = this.safeColor(task.sphereColor);
+        const safeTaskId = this.safeId(task.id);
 
-        const listItems = task.checklist.map((c, idx) => `
-          <div class="inline-subtask-row ${c.completed ? 'completed' : ''}">
-            <input type="checkbox" class="task-checkbox inline-subtask-chk" data-task-id="${safeTaskId}" data-sub-idx="${idx}" ${c.completed ? 'checked' : ''} style="width:18px;height:18px;min-width:18px;min-height:18px;">
-            <span>${this.escapeHtml(c.text)}</span>
-          </div>
-        `).join('');
+        let badgesHtml = '';
+        if (task.isDueToday) {
+          badgesHtml += `<span class="task-property-badge" style="background: var(--folder-amber); color: #141414;">🔥 Сегодня</span>`;
+        } else if (task.deadline) {
+          badgesHtml += `<span class="task-property-badge">📅 ${this.formatDate(task.deadline)}</span>`;
+        }
 
-        inlineChecklistHtml = `
-          <div class="inline-checklist-wrap" style="width:100%;">
-            <button class="inline-checklist-toggle" data-toggle-id="${toggleKey}">
-              ☑️ Подзадачи (${done}/${total}) <span class="chevron">${isOpen ? '▲' : '▼'}</span>
-            </button>
-            <div class="inline-checklist-body" id="chkbody-${toggleKey}" style="display: ${isOpen ? 'flex' : 'none'};">
-              ${listItems}
+        // Мягкий бейдж переноса (Вчера / 2 дня / 3 дня)
+        if (task.rolloverText) {
+          badgesHtml += `<span class="task-property-badge" style="background: var(--bg-card); color: var(--ink-muted); border-style: dashed;">⏳ ${task.rolloverText}</span>`;
+        }
+
+        if (task.note && task.note.trim()) {
+          badgesHtml += `<span class="task-property-badge">📝</span>`;
+        }
+
+        let inlineChecklistHtml = '';
+        if (task.checklist && task.checklist.length > 0) {
+          const done = task.checklist.filter(s => s.completed).length;
+          const total = task.checklist.length;
+          const toggleKey = `foc-${safeTaskId}`;
+          const isOpen = this.openChecklistIds && this.openChecklistIds.has(toggleKey);
+
+          const listItems = task.checklist.map((c, idx) => `
+            <div class="inline-subtask-row ${c.completed ? 'completed' : ''}">
+              <input type="checkbox" class="task-checkbox inline-subtask-chk" data-task-id="${safeTaskId}" data-sub-idx="${idx}" ${c.completed ? 'checked' : ''} style="width:18px;height:18px;min-width:18px;min-height:18px;">
+              <span>${this.escapeHtml(c.text)}</span>
             </div>
+          `).join('');
+
+          inlineChecklistHtml = `
+            <div class="inline-checklist-wrap" style="width:100%;">
+              <button class="inline-checklist-toggle" data-toggle-id="${toggleKey}">
+                ☑️ Подзадачи (${done}/${total}) <span class="chevron">${isOpen ? '▲' : '▼'}</span>
+              </button>
+              <div class="inline-checklist-body" id="chkbody-${toggleKey}" style="display: ${isOpen ? 'flex' : 'none'};">
+                ${listItems}
+              </div>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="task-item ${task.completed ? 'task-completed' : ''}" data-task-id="${safeTaskId}">
+            <div class="task-main-row">
+              <input type="checkbox" class="task-checkbox chk-focus-task" id="chk-${safeTaskId}" ${task.completed ? 'checked' : ''} aria-label="Отметить выполненной">
+              <span class="task-text open-focus-task-modal" data-task-id="${safeTaskId}">${safeTitle}</span>
+              <button class="task-star-btn unfocus-focus-btn" title="Убрать из фокуса дня" aria-label="Убрать из фокуса дня" data-unfocus-id="${safeTaskId}">⭐</button>
+            </div>
+            
+            <div class="task-footer-row">
+              <div class="task-badges-left">
+                ${badgesHtml}
+              </div>
+              <span class="tag-project">
+                <span class="tag-dot" style="background-color: ${sphereColor};"></span>
+                ${safeProject}
+              </span>
+            </div>
+            ${inlineChecklistHtml}
           </div>
         `;
-      }
-
-      return `
-        <div class="task-item ${task.completed ? 'task-completed' : ''}" data-task-id="${safeTaskId}">
-          <div class="task-main-row">
-            <input type="checkbox" class="task-checkbox chk-focus-task" id="chk-${safeTaskId}" ${task.completed ? 'checked' : ''} aria-label="Отметить выполненной">
-            <span class="task-text open-focus-task-modal" data-task-id="${safeTaskId}">${safeTitle}</span>
-            <button class="task-star-btn unfocus-focus-btn" title="Убрать из фокуса дня" aria-label="Убрать из фокуса дня" data-unfocus-id="${safeTaskId}">⭐</button>
-          </div>
-          
-          <div class="task-footer-row">
-            <div class="task-badges-left">
-              ${badgesHtml}
-            </div>
-            <span class="tag-project">
-              <span class="tag-dot" style="background-color: ${sphereColor};"></span>
-              ${safeProject}
-            </span>
-          </div>
-          ${inlineChecklistHtml}
-        </div>
-      `;
-    }).join('');
+      }).join('');
+    }
 
     this.bindFocusEvents();
+    
+    // ВЫЗЫВАЕМ ОБНОВЛЕНИЕ СЧЕТЧИКА И СПИСКА 7 ДНЕЙ ПРИ КАЖДОЙ ПЕРЕРИСОВКЕ
+    this.renderWeekTasks();
   },
 
   bindFocusEvents() {

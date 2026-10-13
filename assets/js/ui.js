@@ -125,6 +125,7 @@ window.LifeUI = {
   projectSelectedColor: '#FFD027',
 
   currentEditingChecklist: [],
+  openChecklistIds: new Set(), // Хранилище открытых аккордеонов
   isDragging: false,
   pendingRender: false,
 
@@ -708,6 +709,9 @@ palette: [
       if (task.checklist && task.checklist.length > 0) {
         const done = task.checklist.filter(s => s.completed).length;
         const total = task.checklist.length;
+        const toggleKey = `proj-${safeTaskId}`;
+        const isOpen = this.openChecklistIds && this.openChecklistIds.has(toggleKey);
+
         const listItems = task.checklist.map((c, idx) => `
           <div class="inline-subtask-row ${c.completed ? 'completed' : ''}">
             <input type="checkbox" class="task-checkbox inline-subtask-chk" data-task-id="${safeTaskId}" data-sub-idx="${idx}" ${c.completed ? 'checked' : ''} style="width:18px;height:18px;min-width:18px;min-height:18px;">
@@ -717,10 +721,10 @@ palette: [
 
         inlineChecklistHtml = `
           <div class="inline-checklist-wrap">
-            <button class="inline-checklist-toggle" data-toggle-id="proj-${safeTaskId}">
-              ☑️ Подзадачи (${done}/${total}) <span class="chevron">▼</span>
+            <button class="inline-checklist-toggle" data-toggle-id="${toggleKey}">
+              ☑️ Подзадачи (${done}/${total}) <span class="chevron">${isOpen ? '▲' : '▼'}</span>
             </button>
-            <div class="inline-checklist-body" id="chkbody-proj-${safeTaskId}" style="display: none;">
+            <div class="inline-checklist-body" id="chkbody-${toggleKey}" style="display: ${isOpen ? 'flex' : 'none'};">
               ${listItems}
             </div>
           </div>
@@ -800,15 +804,17 @@ palette: [
 
     this.projectTasksList.querySelectorAll('.inline-checklist-toggle').forEach(btn => {
       btn.addEventListener('click', () => {
-        const bodyId = `chkbody-${btn.getAttribute('data-toggle-id')}`;
-        const body = document.getElementById(bodyId);
+        const toggleKey = btn.getAttribute('data-toggle-id');
+        const body = document.getElementById(`chkbody-${toggleKey}`);
         const chev = btn.querySelector('.chevron');
         if (body.style.display === 'none') {
           body.style.display = 'flex';
           chev.textContent = '▲';
+          this.openChecklistIds.add(toggleKey);
         } else {
           body.style.display = 'none';
           chev.textContent = '▼';
+          this.openChecklistIds.delete(toggleKey);
         }
       });
     });
@@ -943,6 +949,9 @@ palette: [
       if (task.checklist && task.checklist.length > 0) {
         const done = task.checklist.filter(s => s.completed).length;
         const total = task.checklist.length;
+        const toggleKey = `foc-${safeTaskId}`;
+        const isOpen = this.openChecklistIds && this.openChecklistIds.has(toggleKey);
+
         const listItems = task.checklist.map((c, idx) => `
           <div class="inline-subtask-row ${c.completed ? 'completed' : ''}">
             <input type="checkbox" class="task-checkbox inline-subtask-chk" data-task-id="${safeTaskId}" data-sub-idx="${idx}" ${c.completed ? 'checked' : ''} style="width:18px;height:18px;min-width:18px;min-height:18px;">
@@ -952,10 +961,10 @@ palette: [
 
         inlineChecklistHtml = `
           <div class="inline-checklist-wrap" style="width:100%;">
-            <button class="inline-checklist-toggle" data-toggle-id="foc-${safeTaskId}">
-              ☑️ Подзадачи (${done}/${total}) <span class="chevron">▼</span>
+            <button class="inline-checklist-toggle" data-toggle-id="${toggleKey}">
+              ☑️ Подзадачи (${done}/${total}) <span class="chevron">${isOpen ? '▲' : '▼'}</span>
             </button>
-            <div class="inline-checklist-body" id="chkbody-foc-${safeTaskId}" style="display: none;">
+            <div class="inline-checklist-body" id="chkbody-${toggleKey}" style="display: ${isOpen ? 'flex' : 'none'};">
               ${listItems}
             </div>
           </div>
@@ -988,7 +997,6 @@ palette: [
   },
 
   bindFocusEvents() {
-    // 1. Отметка задачи только по чекбоксу
     const checkboxes = this.focusList.querySelectorAll('.chk-focus-task');
     checkboxes.forEach(box => {
       box.addEventListener('change', (e) => {
@@ -1011,7 +1019,6 @@ palette: [
       });
     });
 
-    // 2. Клик по тексту открывает модалку задачи
     const titles = this.focusList.querySelectorAll('.open-focus-task-modal');
     titles.forEach(el => {
       el.addEventListener('click', () => {
@@ -1020,7 +1027,6 @@ palette: [
       });
     });
 
-    // 3. Звездочка убирает из фокуса
     const starButtons = this.focusList.querySelectorAll('.unfocus-focus-btn');
     starButtons.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1032,23 +1038,23 @@ palette: [
       });
     });
 
-    // 4. Раскрытие чеклиста
     this.focusList.querySelectorAll('.inline-checklist-toggle').forEach(btn => {
       btn.addEventListener('click', () => {
-        const bodyId = `chkbody-${btn.getAttribute('data-toggle-id')}`;
-        const body = document.getElementById(bodyId);
+        const toggleKey = btn.getAttribute('data-toggle-id');
+        const body = document.getElementById(`chkbody-${toggleKey}`);
         const chev = btn.querySelector('.chevron');
         if (body.style.display === 'none') {
           body.style.display = 'flex';
           chev.textContent = '▲';
+          this.openChecklistIds.add(toggleKey);
         } else {
           body.style.display = 'none';
           chev.textContent = '▼';
+          this.openChecklistIds.delete(toggleKey);
         }
       });
     });
 
-    // 5. Отметка подзадач
     this.focusList.querySelectorAll('.inline-subtask-chk').forEach(chk => {
       chk.addEventListener('change', (e) => {
         const taskId = chk.getAttribute('data-task-id');
@@ -1276,7 +1282,6 @@ palette: [
     let touchStartX = 0;
     let touchStartY = 0;
 
-    // ---- 1. МЕХАНИКА ДЛЯ ПК (МЫШЬ) ----
     container.addEventListener('dragstart', (e) => {
       const item = e.target.closest(itemSelector);
       if (!item || item.parentElement !== container) return;
@@ -1284,7 +1289,6 @@ palette: [
       this.isDragging = true;
       dragEl = item;
 
-      // Вычисляем смещение хвата (чтобы физика считала центр карточки, а не курсор)
       const rect = item.getBoundingClientRect();
       dragEl._dragOffsetX = e.clientX - rect.left;
       dragEl._dragOffsetY = e.clientY - rect.top;
@@ -1313,13 +1317,11 @@ palette: [
       const midX = rect.left + rect.width / 2;
       const midY = rect.top + rect.height / 2;
 
-      // Вычисляем, где физически находится ЦЕНТР перетаскиваемой карточки
       const ghostCenterX = e.clientX - dragEl._dragOffsetX + dragEl._dragWidth / 2;
       const ghostCenterY = e.clientY - dragEl._dragOffsetY + dragEl._dragHeight / 2;
 
       let isAfter = false;
       if (isGrid) {
-        // Мягкая проверка рядов: если центры на одной высоте - двигаем по оси X
         const inSameRow = Math.abs(ghostCenterY - midY) < rect.height * 0.4;
         isAfter = inSameRow ? ghostCenterX > midX : ghostCenterY > midY;
       } else {
@@ -1360,13 +1362,12 @@ palette: [
       }
     });
 
-    // ---- 2. МЕХАНИКА ДЛЯ ТЕЛЕФОНОВ (ПАЛЕЦ) ----
+    // Touch события
     container.addEventListener('touchstart', (e) => {
       const item = e.target.closest(itemSelector);
       if (!item || item.parentElement !== container) return;
       if (e.target.closest('button, input, textarea, a, .task-checkbox')) return;
 
-      // Жестко отключаем системные выделения, чтобы не вылезал "призрак" iOS
       item.style.webkitUserSelect = 'none';
       item.setAttribute('draggable', 'false');
 
@@ -1380,6 +1381,10 @@ palette: [
         dragEl = item;
         isTouchDragging = true;
 
+        // БЛОКИРУЕМ СКРОЛЛ СТРАНИЦЫ НА ТЕЛЕФОНЕ ВО ВРЕМЯ ПЕРЕТАСКИВАНИЯ
+        document.body.style.overflow = 'hidden';
+        document.body.style.touchAction = 'none';
+
         const rect = item.getBoundingClientRect();
         dragEl._dragOffsetX = touchStartX - rect.left;
         dragEl._dragOffsetY = touchStartY - rect.top;
@@ -1387,11 +1392,10 @@ palette: [
         dragEl._dragHeight = rect.height;
 
         item.classList.add('dragging');
-        if (navigator.vibrate) navigator.vibrate(30);
+        if (window.LifeConfig) window.LifeConfig.vibrate(30);
       }, 190);
     }, { passive: true });
 
-    // Блокируем вызов системного меню копирования на долгом тапе
     container.addEventListener('contextmenu', (e) => {
       if (isTouchDragging || window.LifeUI.isDragging) e.preventDefault();
     });
@@ -1400,7 +1404,6 @@ palette: [
       const touch = e.touches[0];
 
       if (!isTouchDragging) {
-        // Если человек скроллит (а не тащит), возвращаем обычное поведение
         const deltaX = Math.abs(touch.clientX - touchStartX);
         const deltaY = Math.abs(touch.clientY - touchStartY);
         if (deltaX > 8 || deltaY > 8) {
@@ -1428,7 +1431,6 @@ palette: [
       const midX = rect.left + rect.width / 2;
       const midY = rect.top + rect.height / 2;
 
-      // Умная геометрия центра для пальца
       const ghostCenterX = touch.clientX - dragEl._dragOffsetX + dragEl._dragWidth / 2;
       const ghostCenterY = touch.clientY - dragEl._dragOffsetY + dragEl._dragHeight / 2;
 
@@ -1443,7 +1445,7 @@ palette: [
       const nextSibling = isAfter ? target.nextElementSibling : target;
       if (nextSibling !== dragEl && nextSibling !== dragEl.nextElementSibling) {
         container.insertBefore(dragEl, nextSibling);
-        if (navigator.vibrate) navigator.vibrate(10); // Микро-щелчок при перестановке
+        if (window.LifeConfig) window.LifeConfig.vibrate(10);
       }
     }, { passive: false });
 
@@ -1452,7 +1454,10 @@ palette: [
       this.stopAutoScroll();
       window.LifeUI.isDragging = false;
 
-      // Сбрасываем блокировки после того, как палец убрали
+      // ВОССТАНАВЛИВАЕМ СКРОЛЛ СТРАНИЦЫ
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+
       if (dragEl) {
         dragEl.setAttribute('draggable', 'true');
         dragEl.style.webkitUserSelect = '';
@@ -1467,6 +1472,8 @@ palette: [
       if (isTouchDragging && dragEl) {
         const draggedItem = dragEl;
         draggedItem.classList.remove('dragging');
+        draggedItem.setAttribute('draggable', 'true');
+        draggedItem.style.webkitUserSelect = '';
         draggedItem.classList.add('was-dragged');
         setTimeout(() => draggedItem.classList.remove('was-dragged'), 300);
 
@@ -1735,9 +1742,11 @@ palette: [
     if (this.diagYandexBtn) this.diagYandexBtn.addEventListener('click', runDiagHandler);
     if (this.diagYandexConnectedBtn) this.diagYandexConnectedBtn.addEventListener('click', runDiagHandler);
 
-    this.downloadBackupBtn.addEventListener('click', () => {
-      const fileName = window.LifeBackup.exportData();
-      this.showToast(`Резервная копия скачана: ${fileName}`);
+    this.downloadBackupBtn.addEventListener('click', async () => {
+      const fileName = await window.LifeBackup.exportData();
+      if (fileName) {
+        this.showToast(`Резервная копия сохранена: ${fileName}`);
+      }
     });
 
     this.modeMergeBtn.addEventListener('click', () => {

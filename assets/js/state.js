@@ -64,7 +64,7 @@ window.LifeState = {
       updatedAt: Date.now()
     };
 
-    this.data.spheres.push(newSphere);
+    this.data.spheres.unshift(newSphere); // Добавляем на первое место
     window.LifeStorage.save(this.data);
     return newSphere;
   },
@@ -129,7 +129,7 @@ window.LifeState = {
       updatedAt: Date.now()
     };
 
-    this.data.projects.push(newProject);
+    this.data.projects.unshift(newProject); // Добавляем на первое место
     window.LifeStorage.save(this.data);
     return newProject;
   },
@@ -180,7 +180,7 @@ window.LifeState = {
       updatedAt: Date.now()
     };
 
-    this.data.tasks.push(newTask);
+    this.data.tasks.unshift(newTask); // Добавляем на первое место
     window.LifeStorage.save(this.data);
     return newTask;
   },

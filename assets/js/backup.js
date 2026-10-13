@@ -1,6 +1,6 @@
 // Модуль резервного копирования и портируемости данных (Local-First)
 window.LifeBackup = {
-  exportData() {
+  async exportData() {
     const rawData = window.LifeState.data || window.LifeStorage.load();
     
     const exportPayload = {
@@ -11,14 +11,50 @@ window.LifeBackup = {
     };
 
     const jsonString = JSON.stringify(exportPayload, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10);
     const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
     const filename = `life_os_backup_${dateStr}_${timeStr}.json`;
 
+    // 1. Проводник с выбором папки (ПК / Chrome / Edge)
+    if ('showSaveFilePicker' in window) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{
+            description: 'Файл резервной копии JSON',
+            accept: { 'application/json': ['.json'] }
+          }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(jsonString);
+        await writable.close();
+        return filename;
+      } catch (err) {
+        if (err.name === 'AbortError') return null; // Пользователь сам отменил диалог
+      }
+    }
+
+    const blob = new Blob([jsonString], { type: 'application/json' });
+
+    // 2. Системное мобильное меню «Сохранить в Файлы / Диск» (Android & iOS)
+    if (navigator.canShare) {
+      const file = new File([blob], filename, { type: 'application/json' });
+      if (navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'Резервная копия Life OS'
+          });
+          return filename;
+        } catch (err) {
+          if (err.name === 'AbortError') return null;
+        }
+      }
+    }
+
+    // 3. Fallback: классическое скачивание, если система совсем старая
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;

@@ -708,6 +708,10 @@ palette: [
       if (task.deadline) {
         badgesHtml += `<span class="task-property-badge">📅 ${this.formatDate(task.deadline)}</span>`;
       }
+      // ОТОБРАЖАЕМ СВОЙСТВО "НА НЕДЕЛЮ" НА КАРТОЧКЕ ЗАДАЧИ
+      if (task.inWeek) {
+        badgesHtml += `<span class="task-property-badge">🗓️ На неделе</span>`;
+      }
       if (task.note && task.note.trim()) {
         badgesHtml += `<span class="task-property-badge">📝</span>`;
       }

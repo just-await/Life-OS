@@ -1311,7 +1311,7 @@ palette: [
     card.style.overflow = 'hidden';
 
     requestAnimationFrame(() => {
-      card.style.transition = 'height 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      card.style.transition = 'height 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)';
       card.style.height = `${newHeight}px`;
     });
 

@@ -1,5 +1,5 @@
-// sw.js — Service Worker Life OS v2.1
-const CACHE_NAME = 'life-os-v2.1-' + '2026-10-14';
+// sw.js — Service Worker Life OS v2.2 (Force Reset Cache)
+const CACHE_NAME = 'life-os-v2.2-force-reset-' + Date.now();
 
 const ASSETS_TO_CACHE = [
   './',
@@ -23,8 +23,8 @@ const ASSETS_TO_CACHE = [
   './assets/fonts/golos-text-regular.woff2',
   './assets/fonts/golos-text-semibold.woff2',
   './assets/fonts/golos-text-bold.woff2',
-  './assets/fonts/unbounded-bold.woff2',
-  './assets/fonts/unbounded-extrabold.woff2'
+  './assets/fonts/unbounded-medium.woff2',
+  './assets/fonts/unbounded-bold.woff2'
 ];
 
 self.addEventListener('install', (event) => {

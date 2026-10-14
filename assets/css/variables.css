@@ -1,9 +1,9 @@
 /* assets/css/variables.css */
-/* 1. ЛОКАЛЬНЫЕ ШРИФТЫ (ДЛЯ РАБОТЫ 100% БЕЗ СЕТИ) */
+/* 1. ЛОКАЛЬНЫЕ АВТОНОМНЫЕ ШРИФТЫ */
 @font-face {
   font-family: 'Golos Text';
   src: url('../fonts/golos-text-regular.woff2') format('woff2');
-  font-weight: 400 500;
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
@@ -19,14 +19,6 @@
 @font-face {
   font-family: 'Golos Text';
   src: url('../fonts/golos-text-bold.woff2') format('woff2');
-  font-weight: 700 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Unbounded';
-  src: url('../fonts/unbounded-bold.woff2') format('woff2');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -34,14 +26,22 @@
 
 @font-face {
   font-family: 'Unbounded';
-  src: url('../fonts/unbounded-extrabold.woff2') format('woff2');
-  font-weight: 800;
+  src: url('../fonts/unbounded-medium.woff2') format('woff2');
+  font-weight: 500 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Unbounded';
+  src: url('../fonts/unbounded-bold.woff2') format('woff2');
+  font-weight: 700 800;
   font-style: normal;
   font-display: swap;
 }
 
 :root {
-  /* Светлая тема (🥛 Молоко / Бумага) */
+  /* Светлая тема */
   --bg-paper: #F6F3EB;
   --bg-card: #FFFFFF;
   --bg-subcard: #FAFAFA;
@@ -63,16 +63,16 @@
   --transition-tactile: 0.12s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* ВКУСНАЯ ТЁМНАЯ ТЕМА BODREN (☕ Эспрессо, Горячий Круассан и Мята) */
+/* Вкусная темная тема Bodren */
 [data-theme="dark"] {
-  --bg-paper: #221714;       /* Глубокий благородный эспрессо */
-  --bg-card: #2F211C;        /* Тёплый обжаренный мокко */
-  --bg-subcard: #3D2B24;     /* Кофейная пенка */
-  --bg-beige: #E8D4BE;       /* Хрустящий золотисто-бежевый круассан */
-  --ink-black: #FAF4ED;      /* Взбитые сливочные сливки */
-  --ink-muted: #BFA997;      /* Тёплая корица */
-  --border-color: #120B09;   /* Глубокий тёмный контур обжарки */
-  --shadow-color: #0C0705;   /* Плотная чернильная тень чашки */
-  --accent-done: #4EBA97;    /* Мятный акцент Bodren */
-  --folder-amber: #E89B38;   /* Карамельный сироп */
+  --bg-paper: #221714;
+  --bg-card: #2F211C;
+  --bg-subcard: #3D2B24;
+  --bg-beige: #E8D4BE;
+  --ink-black: #FAF4ED;
+  --ink-muted: #BFA997;
+  --border-color: #120B09;
+  --shadow-color: #0C0705;
+  --accent-done: #4EBA97;
+  --folder-amber: #E89B38;
 }

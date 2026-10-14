@@ -1,10 +1,11 @@
 // assets/js/viral.js
-// Модуль вирального маркетинга: Динамический Чек Дня (Canvas) и Шаблоны сфер
+// Модуль вирального маркетинга: Динамический Чек Дня с защитой от вылета текста + Валидация шаблонов
 window.LifeViral = {
   currentDayTicketBlob: null,
   pendingTemplateData: null,
 
   init() {
+    window.LifeLog.info('LifeViral', 'Инициализация модуля виральности...');
     this.bindEvents();
     this.checkUrlForTemplate();
     window.addEventListener('hashchange', () => this.checkUrlForTemplate());
@@ -56,7 +57,56 @@ window.LifeViral = {
     if (closeImportBtn) closeImportBtn.addEventListener('click', hideImportModal);
   },
 
-  // 1. ИДЕАЛЬНЫЙ ДИНАМИЧЕСКИЙ ЧЕК ПРОДУКТИВНОСТИ
+  // УМНЫЙ АЛГОРИТМ ПЕРЕНОСА ТЕКСТА (РАЗБИВАЕТ ДАЖЕ СВЕРХДЛИННЫЕ СЛОВА БЕЗ ПРОБЕЛОВ)
+  wrapCanvasText(ctx, text, maxWidth, maxLines = 2) {
+    const words = String(text || '').split(' ');
+    const lines = [];
+    let currentLine = '';
+
+    for (let i = 0; i < words.length; i++) {
+      let word = words[i];
+
+      // Если само слово длиннее доступной ширины строки — делим его посимвольно
+      if (ctx.measureText(word).width > maxWidth) {
+        for (let j = 0; j < word.length; j++) {
+          const char = word[j];
+          if (ctx.measureText(currentLine + char).width > maxWidth) {
+            lines.push(currentLine.trim());
+            currentLine = char;
+            if (lines.length >= maxLines - 1) break;
+          } else {
+            currentLine += char;
+          }
+        }
+      } else {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        if (ctx.measureText(testLine).width > maxWidth) {
+          lines.push(currentLine.trim());
+          currentLine = word;
+          if (lines.length >= maxLines - 1) {
+            // Оставшиеся слова укладываем в последнюю строку с многоточием
+            const remainder = words.slice(i).join(' ');
+            let lastLine = remainder;
+            while (lastLine.length > 0 && ctx.measureText(lastLine + '…').width > maxWidth) {
+              lastLine = lastLine.slice(0, -1);
+            }
+            currentLine = lastLine + '…';
+            break;
+          }
+        } else {
+          currentLine = testLine;
+        }
+      }
+    }
+
+    if (currentLine && lines.length < maxLines) {
+      lines.push(currentLine.trim());
+    }
+
+    return lines;
+  },
+
+  // 1. ДИНАМИЧЕСКИЙ ЧЕК ПРОДУКТИВНОСТИ БЕЗ ВЫЛЕТОВ ТЕКСТА
   async generateDayTicketCanvas() {
     if (document.fonts && document.fonts.ready) {
       await document.fonts.ready;
@@ -68,7 +118,6 @@ window.LifeViral = {
     const totalCount = tasks.length;
     const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-    // 1. Предварительный расчет точной высоты всех задач
     const testCanvas = document.createElement('canvas');
     const testCtx = testCanvas.getContext('2d');
     testCtx.font = '700 26px "Golos Text", system-ui, sans-serif';
@@ -80,15 +129,10 @@ window.LifeViral = {
       computedTasksH = 80;
     } else {
       tasks.forEach(t => {
-        let itemH = 44; // Базовая высота строки
-        // Проверяем, переносится ли текст на 2 строки
-        if (testCtx.measureText(t.title).width > maxTextW) {
-          itemH += 34;
-        }
-        if (t.projectName) {
-          itemH += 28;
-        }
-        computedTasksH += itemH + 26; // Отступ между задачами
+        const lines = this.wrapCanvasText(testCtx, t.title, maxTextW, 2);
+        let itemH = lines.length * 34;
+        if (t.projectName) itemH += 28;
+        computedTasksH += itemH + 26;
       });
     }
 
@@ -96,7 +140,6 @@ window.LifeViral = {
     const headerH = 270;
     const footerH = 160;
 
-    // Точная высота холста: никаких пустых километров снизу!
     const canvas = document.createElement('canvas');
     canvas.width = 1080;
     canvas.height = Math.round(pad * 2 + headerH + computedTasksH + footerH);
@@ -110,11 +153,9 @@ window.LifeViral = {
     const accent = isDark ? '#4EBA97' : '#52C41A';
     const border = isDark ? '#120B09' : '#141414';
 
-    // 1. Полотно стола
     ctx.fillStyle = bgPaper;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 2. Бумажный чек с тенью
     const cardW = canvas.width - pad * 2;
     const cardH = canvas.height - pad * 2;
 
@@ -127,7 +168,6 @@ window.LifeViral = {
     ctx.lineWidth = 7;
     ctx.strokeRect(pad, pad, cardW, cardH);
 
-    // 3. Шапка чека
     ctx.fillStyle = ink;
     ctx.font = '800 44px "Unbounded", system-ui, sans-serif';
     ctx.fillText('⚡ LIFE OS', pad + 40, pad + 80);
@@ -143,7 +183,6 @@ window.LifeViral = {
     ctx.font = '700 24px "Golos Text", system-ui, sans-serif';
     ctx.fillText(dateFormatted, canvas.width - pad - 40, pad + 80);
 
-    // Перфорация
     ctx.textAlign = 'left';
     ctx.strokeStyle = border;
     ctx.lineWidth = 3;
@@ -154,14 +193,13 @@ window.LifeViral = {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 4. Плашка прогресса с АВТО-ПОДГОНОМ ШИРИНЫ (текст никогда не вылезет)
     const badgeX = pad + 40;
     const badgeY = pad + 185;
     const badgeText = percent === 100 ? '✓ 100% ВЫПОЛНЕНО' : `ИТОГ: ${completedCount}/${totalCount} (${percent}%)`;
     
     ctx.font = '800 22px "Unbounded", system-ui, sans-serif';
     const badgeTextW = ctx.measureText(badgeText).width;
-    const badgeW = badgeTextW + 48; // Всегда идеальные поля вокруг текста
+    const badgeW = badgeTextW + 48;
     const badgeH = 54;
 
     ctx.fillStyle = percent === 100 ? accent : (isDark ? '#3D2B24' : '#F6F3EB');
@@ -173,7 +211,6 @@ window.LifeViral = {
     ctx.fillStyle = percent === 100 ? '#FFFFFF' : ink;
     ctx.fillText(badgeText, badgeX + 24, badgeY + 35);
 
-    // Винтажный штамп в правом углу
     ctx.save();
     ctx.translate(canvas.width - pad - 160, badgeY + 27);
     ctx.rotate((-7 * Math.PI) / 180);
@@ -186,7 +223,6 @@ window.LifeViral = {
     ctx.fillText(percent === 100 ? '★ ЗАКРЫТО ★' : 'В ПРОЦЕССЕ', 0, 7);
     ctx.restore();
 
-    // 5. Задачи с аккуратным переносом
     let curY = pad + 320;
     ctx.textAlign = 'left';
 
@@ -196,7 +232,6 @@ window.LifeViral = {
       ctx.fillText('☕ На сегодня дел нет. Время перезагрузиться!', pad + 40, curY + 20);
     } else {
       tasks.forEach((t) => {
-        // Чекбокс
         ctx.strokeStyle = border;
         ctx.lineWidth = 5;
         ctx.strokeRect(pad + 40, curY - 26, 36, 36);
@@ -209,66 +244,37 @@ window.LifeViral = {
           ctx.fillText('✓', pad + 48, curY - 1);
         }
 
-        // Текст задачи (умный перенос до 2 строк)
         ctx.fillStyle = t.completed ? inkMuted : ink;
         ctx.font = '700 26px "Golos Text", system-ui, sans-serif';
 
-        const maxTextW = canvas.width - pad * 2 - 160;
-        const words = t.title.split(' ');
-        let line1 = '';
-        let line2 = '';
+        const lines = this.wrapCanvasText(ctx, t.title, maxTextW, 2);
+        let subY = curY;
 
-        for (let i = 0; i < words.length; i++) {
-          const testLine = line1 + words[i] + ' ';
-          if (ctx.measureText(testLine).width < maxTextW) {
-            line1 = testLine;
-          } else {
-            line2 = words.slice(i).join(' ');
-            break;
-          }
-        }
-
-        ctx.fillText(line1.trim(), pad + 95, curY);
-
-        if (t.completed) {
-          const w1 = ctx.measureText(line1.trim()).width;
-          ctx.strokeStyle = inkMuted;
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(pad + 95, curY - 7);
-          ctx.lineTo(pad + 95 + w1, curY - 7);
-          ctx.stroke();
-        }
-
-        let subLineY = curY;
-        if (line2) {
-          subLineY += 34;
-          const displayLine2 = line2.length > 55 ? line2.slice(0, 55) + '…' : line2;
-          ctx.fillText(displayLine2, pad + 95, subLineY);
+        lines.forEach((line) => {
+          ctx.fillText(line, pad + 95, subY);
           if (t.completed) {
-            const w2 = ctx.measureText(displayLine2).width;
+            const w = ctx.measureText(line).width;
             ctx.strokeStyle = inkMuted;
             ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(pad + 95, subLineY - 7);
-            ctx.lineTo(pad + 95 + w2, subLineY - 7);
+            ctx.moveTo(pad + 95, subY - 7);
+            ctx.lineTo(pad + 95 + w, subY - 7);
             ctx.stroke();
           }
-        }
+          subY += 34;
+        });
 
-        // Бейдж проекта под задачей
         if (t.projectName) {
-          subLineY += 30;
           ctx.font = '600 18px "Golos Text", system-ui, sans-serif';
           ctx.fillStyle = inkMuted;
-          ctx.fillText(`• ${t.projectName}`, pad + 95, subLineY);
+          ctx.fillText(`• ${t.projectName}`, pad + 95, subY - 6);
+          subY += 28;
         }
 
-        curY = subLineY + 54;
+        curY = subY + 26;
       });
     }
 
-    // 6. Подвал встает ровно под задачами (ноль лишней пустоты)
     const footerY = curY + 20;
     ctx.strokeStyle = border;
     ctx.lineWidth = 3;
@@ -351,7 +357,7 @@ window.LifeViral = {
     this.downloadDayTicket();
   },
 
-  // 2. ПУЛЕНЕПРОБИВАЕМЫЙ ДЕКОДЕР ШАБЛОНОВ СФЕР
+  // 2. БЕЗОПАСНЫЙ ЭКСПОРТ И ИМПОРТ ШАБЛОНОВ С ВАЛИДАЦИЕЙ
   exportSphereTemplate(sphereId) {
     const sphere = window.LifeState.getSphere(sphereId);
     if (!sphere) return;
@@ -364,23 +370,23 @@ window.LifeViral = {
       type: 'LIFE_OS_SPHERE_TEMPLATE',
       version: 1,
       sphere: {
-        title: sphere.title,
+        title: sphere.title.slice(0, 50),
         icon: sphere.icon,
         color: sphere.color
       },
-      projects: projects.map(p => ({
+      projects: projects.slice(0, 25).map(p => ({
         tempId: p.id,
-        title: p.title,
+        title: p.title.slice(0, 60),
         icon: p.icon,
         color: p.color
       })),
-      tasks: tasks.map(t => ({
+      tasks: tasks.slice(0, 150).map(t => ({
         tempProjectId: t.projectId,
-        title: t.title,
+        title: t.title.slice(0, 150),
         deadline: t.deadline,
         inWeek: t.inWeek,
-        note: t.note,
-        checklist: t.checklist || []
+        note: (t.note || '').slice(0, 500),
+        checklist: (t.checklist || []).slice(0, 20).map(c => ({ text: String(c.text || '').slice(0, 80), completed: false }))
       }))
     };
 
@@ -392,7 +398,7 @@ window.LifeViral = {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(shareUrl);
       window.LifeUI.customAlert(
-        `Ссылка на шаблон сферы «${sphere.title}» скопирована в буфер обмена!<br><br>Отправьте ее в Telegram, чат или соцсети: любой, кто перейдет по ней, сможет распаковать эту готовую сферу в свой планер.`,
+        `Ссылка на шаблон сферы «${window.LifeUI.escapeHtml(sphere.title)}» скопирована в буфер обмена!<br><br>Отправьте ее в Telegram, чат или соцсети: любой, кто перейдет по ней, сможет распаковать эту сферу в свой планер.`,
         'Ссылка-шаблон готова 📋'
       );
     } else {
@@ -409,17 +415,39 @@ window.LifeViral = {
       if (!match) return;
 
       const rawBase64 = decodeURIComponent(match[1]).replace(/ /g, '+');
+      
+      // Защита: отклоняем аномально большие хэши (> 35 000 символов)
+      if (rawBase64.length > 35000) {
+        throw new Error('Размер шаблона превышает допустимый лимит безопасности.');
+      }
+
       const jsonStr = decodeURIComponent(escape(atob(rawBase64)));
       const data = JSON.parse(jsonStr);
 
-      if (data && data.type === 'LIFE_OS_SPHERE_TEMPLATE' && data.sphere) {
-        this.pendingTemplateData = data;
-        // Очищаем хэш из адресной строки без перезагрузки
-        history.replaceState(null, document.title, window.location.pathname + window.location.search);
-        setTimeout(() => this.showTemplateImportModal(data), 350);
+      // Строгая валидация структуры
+      if (!data || data.type !== 'LIFE_OS_SPHERE_TEMPLATE' || !data.sphere || typeof data.sphere.title !== 'string') {
+        throw new Error('Некорректная структура файла шаблона.');
       }
+
+      if (!Array.isArray(data.projects) || data.projects.length > 30) {
+        throw new Error('Шаблон содержит недопустимое количество проектов.');
+      }
+
+      if (!Array.isArray(data.tasks) || data.tasks.length > 200) {
+        throw new Error('Шаблон содержит недопустимое количество задач.');
+      }
+
+      this.pendingTemplateData = data;
+      history.replaceState(null, document.title, window.location.pathname + window.location.search);
+      setTimeout(() => this.showTemplateImportModal(data), 350);
+      window.LifeLog.info('LifeViral', 'Шаблон успешно проверен и готов к распаковке.');
+
     } catch (err) {
-      console.warn('Ошибка распознавания шаблона сферы:', err);
+      window.LifeLog.error('LifeViral', 'Ошибка разбора ссылки-шаблона', err);
+      history.replaceState(null, document.title, window.location.pathname + window.location.search);
+      if (window.LifeUI) {
+        window.LifeUI.customAlert(`Не удалось открыть шаблон сферы: ${err.message}`, 'Ошибка импорта');
+      }
     }
   },
 
@@ -429,7 +457,8 @@ window.LifeViral = {
     if (!modal || !details) return;
 
     const iconSvg = window.LifeIcons.get(data.sphere.icon || 'folder');
-    const color = data.sphere.color || '#FFD027';
+    const color = window.LifeUI.safeColor(data.sphere.color || '#FFD027');
+    const safeTitle = window.LifeUI.escapeHtml(data.sphere.title);
 
     details.innerHTML = `
       <div style="display: flex; align-items: center; gap: 14px; background: var(--bg-paper); padding: 14px; border-radius: 12px; border: var(--border-width) solid var(--border-color);">
@@ -437,7 +466,7 @@ window.LifeViral = {
           ${iconSvg}
         </div>
         <div>
-          <strong style="font-family: var(--font-heading); font-size: 1.05rem; color: var(--ink-black);">${window.LifeUI.escapeHtml(data.sphere.title)}</strong>
+          <strong style="font-family: var(--font-heading); font-size: 1.05rem; color: var(--ink-black);">${safeTitle}</strong>
           <div style="font-size: 0.8rem; color: var(--ink-muted); margin-top: 2px;">
             Содержит: ${data.projects.length} ${window.LifeUI.declensionProjects(data.projects.length)} • ${data.tasks.length} ${window.LifeUI.declensionTasks(data.tasks.length)}
           </div>

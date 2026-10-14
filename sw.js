@@ -1,5 +1,5 @@
-// assets/sw.js — Service Worker Life OS v2.0
-const CACHE_NAME = 'life-os-v2.0-' + '2026-10-14';
+// sw.js — Service Worker Life OS v2.1
+const CACHE_NAME = 'life-os-v2.1-' + '2026-10-14';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -19,7 +19,12 @@ const ASSETS_TO_CACHE = [
   './assets/js/viral.js',
   './assets/js/ui.js',
   './assets/js/app.js',
-  './assets/icons/icon.png'
+  './assets/icons/icon.png',
+  './assets/fonts/golos-text-regular.woff2',
+  './assets/fonts/golos-text-semibold.woff2',
+  './assets/fonts/golos-text-bold.woff2',
+  './assets/fonts/unbounded-bold.woff2',
+  './assets/fonts/unbounded-extrabold.woff2'
 ];
 
 self.addEventListener('install', (event) => {
@@ -53,14 +58,10 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  const requestUrl = new URL(event.request.url);
-
-  // Игнорируем сетевые запросы к Яндекс Диску
   if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
-  // Навигация (переход на страницы): сеть с откатом на кэш
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
@@ -79,7 +80,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Локальные ресурсы: быстрый кэш с обновлением в фоне
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {

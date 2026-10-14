@@ -487,10 +487,23 @@ palette: [
     }, 2800);
   },
 
+  sanitizeDialogHtml(raw) {
+    if (!raw) return '';
+    const temp = document.createElement('div');
+    temp.textContent = String(raw);
+    let safe = temp.innerHTML;
+    // Возвращаем строго разрешенные теги оформления
+    safe = safe.replace(/&lt;br\s*\/?&gt;/gi, '<br>')
+               .replace(/&lt;strong&gt;/gi, '<strong>').replace(/&lt;\/strong&gt;/gi, '</strong>')
+               .replace(/&lt;b&gt;/gi, '<b>').replace(/&lt;\/b&gt;/gi, '</b>')
+               .replace(/&lt;code&gt;/gi, '<code>').replace(/&lt;\/code&gt;/gi, '</code>');
+    return safe;
+  },
+
   customAlert(message, title = 'Внимание') {
     return new Promise((resolve) => {
       this.customDialogTitle.textContent = title;
-      this.customDialogMessage.innerHTML = message; // Заменили textContent на innerHTML
+      this.customDialogMessage.innerHTML = this.sanitizeDialogHtml(message);
       this.customDialogPromptBox.style.display = 'none';
       this.customDialogCancelBtn.style.display = 'none';
       this.customDialogConfirmBtn.textContent = 'Понятно';

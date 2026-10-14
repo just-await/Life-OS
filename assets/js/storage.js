@@ -1,9 +1,22 @@
 // assets/js/storage.js
-// Двухуровневое Local-First хранилище (Мгновенный кэш + Асинхронный IndexedDB сейф)
+// Двухуровневое бронебойное хранилище (Мгновенный кэш localStorage + Асинхронный сейф IndexedDB)
 const STORAGE_KEY = 'LIFE_OS_DATA_V1';
 const SNAPSHOT_KEY = 'LIFE_OS_SNAPSHOT_PRE_SYNC';
 const IDB_NAME = 'LifeOS_Database';
 const IDB_STORE = 'app_data';
+
+// Единый цветной логгер приложения
+window.LifeLog = {
+  info(module, msg, data = null) {
+    console.log(`%c[${module}]%c ${msg}`, 'background: #FFD027; color: #141414; font-weight: bold; padding: 2px 5px; border-radius: 4px;', 'color: inherit;', data || '');
+  },
+  warn(module, msg, data = null) {
+    console.warn(`%c[${module}]%c ⚠️ ${msg}`, 'background: #FAAD14; color: #141414; font-weight: bold; padding: 2px 5px; border-radius: 4px;', 'color: inherit;', data || '');
+  },
+  error(module, msg, err = null) {
+    console.error(`%c[${module}]%c ❌ ${msg}`, 'background: #CF1322; color: #FFF; font-weight: bold; padding: 2px 5px; border-radius: 4px;', 'color: inherit;', err || '');
+  }
+};
 
 const DEFAULT_INITIAL_DATA = {
   schemaVersion: 1,
@@ -98,17 +111,28 @@ const DEFAULT_INITIAL_DATA = {
 
 window.LifeStorage = {
   db: null,
+  isInitialized: false,
 
   async init() {
+    window.LifeLog.info('LifeStorage', 'Инициализация двухуровневого хранилища...');
     if (navigator.storage && navigator.storage.persist) {
-      navigator.storage.persist().catch(() => {});
+      try {
+        const isPersisted = await navigator.storage.persist();
+        window.LifeLog.info('LifeStorage', `Статус постоянного хранилища браузера: ${isPersisted ? 'Защищено (Persisted)' : 'Стандартное'}`);
+      } catch (e) {
+        window.LifeLog.warn('LifeStorage', 'Не удалось запросить постоянное хранилище', e);
+      }
     }
+    
     await this.initIndexedDB();
+    await this.verifyAndRestoreFromIDB();
+    this.isInitialized = true;
   },
 
   initIndexedDB() {
     return new Promise((resolve) => {
       if (!window.indexedDB) {
+        window.LifeLog.warn('LifeStorage', 'IndexedDB недоступен в этом браузере. Работаем только через localStorage.');
         resolve(false);
         return;
       }
@@ -117,15 +141,65 @@ window.LifeStorage = {
         const db = e.target.result;
         if (!db.objectStoreNames.contains(IDB_STORE)) {
           db.createObjectStore(IDB_STORE);
+          window.LifeLog.info('LifeStorage', 'Таблица app_data в IndexedDB успешно создана.');
         }
       };
       req.onsuccess = (e) => {
         this.db = e.target.result;
+        window.LifeLog.info('LifeStorage', 'Подключение к базе IndexedDB установлено.');
         resolve(true);
       };
-      req.onerror = () => {
+      req.onerror = (err) => {
+        window.LifeLog.error('LifeStorage', 'Ошибка подключения к IndexedDB', err);
         resolve(false);
       };
+    });
+  },
+
+  // АВАРИЙНЫЙ МОСТ: Если localStorage пуст (Safari стер кэш), поднимаем данные из IndexedDB
+  async verifyAndRestoreFromIDB() {
+    const localRaw = localStorage.getItem(STORAGE_KEY);
+    if (localRaw) {
+      window.LifeLog.info('LifeStorage', 'Оперативные данные найдены в кэше localStorage.');
+      return;
+    }
+
+    window.LifeLog.warn('LifeStorage', 'localStorage пуст! Пытаемся восстановить данные из постоянного сейфа IndexedDB...');
+    if (!this.db) return;
+
+    try {
+      const dataFromIDB = await this.readFromIDB(STORAGE_KEY);
+      if (dataFromIDB && typeof dataFromIDB === 'object' && Array.isArray(dataFromIDB.spheres) && dataFromIDB.spheres.length > 0) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataFromIDB));
+        window.LifeLog.info('LifeStorage', '🎉 ДАННЫЕ УСПЕШНО ВОССТАНОВЛЕНЫ ИЗ INDEXEDDB!', { tasks: dataFromIDB.tasks?.length });
+        
+        if (window.LifeState) {
+          window.LifeState.data = dataFromIDB;
+        }
+        if (window.LifeUI && window.LifeUI.onSilentSyncCompleted) {
+          window.LifeUI.onSilentSyncCompleted();
+          window.LifeUI.showToast('Данные восстановлены из резервного сейфа устройства!');
+        }
+      } else {
+        window.LifeLog.info('LifeStorage', 'IndexedDB также чист. Применяем начальные настройки для первого запуска.');
+      }
+    } catch (err) {
+      window.LifeLog.error('LifeStorage', 'Сбой аварийного чтения из IndexedDB', err);
+    }
+  },
+
+  readFromIDB(key) {
+    return new Promise((resolve, reject) => {
+      if (!this.db) return resolve(null);
+      try {
+        const tx = this.db.transaction(IDB_STORE, 'readonly');
+        const store = tx.objectStore(IDB_STORE);
+        const req = store.get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+      } catch (e) {
+        reject(e);
+      }
     });
   },
 
@@ -134,6 +208,7 @@ window.LifeStorage = {
     try {
       serialized = localStorage.getItem(STORAGE_KEY);
       if (!serialized) {
+        window.LifeLog.info('LifeStorage', 'Загрузка дефолтных демо-данных (первый старт).');
         this.save(DEFAULT_INITIAL_DATA);
         return JSON.parse(JSON.stringify(DEFAULT_INITIAL_DATA));
       }
@@ -150,7 +225,7 @@ window.LifeStorage = {
 
       return parsed;
     } catch (e) {
-      console.error('Ошибка чтения хранилища. Создаем аварийную копию:', e);
+      window.LifeLog.error('LifeStorage', 'Ошибка чтения кэша! Создаем резервную аварийную копию поврежденного файла', e);
       if (serialized) {
         try {
           localStorage.setItem(`${STORAGE_KEY}_corrupt_${Date.now()}`, serialized);
@@ -163,38 +238,45 @@ window.LifeStorage = {
   save(data) {
     if (!data || typeof data !== 'object') return false;
 
-    // 1. Мгновенное сохранение в синхронный кэш
+    // 1. Мгновенная синхронная фиксация в оперативной памяти браузера
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
-      console.warn('localStorage переполнен или недоступен, запись перенаправлена в IndexedDB', e);
+      window.LifeLog.warn('LifeStorage', 'Лимит localStorage исчерпан, запись направлена напрямую в IndexedDB', e);
     }
 
-    // 2. Долговечная асинхронная фиксация в IndexedDB
+    // 2. Долговечная асинхронная запись в IndexedDB
     if (this.db) {
       try {
         const tx = this.db.transaction(IDB_STORE, 'readwrite');
         const store = tx.objectStore(IDB_STORE);
         store.put(data, STORAGE_KEY);
+        tx.oncomplete = () => {
+          // Запись прошла успешно
+        };
+        tx.onerror = (err) => {
+          window.LifeLog.error('LifeStorage', 'Ошибка записи в транзакцию IndexedDB', err);
+        };
       } catch (err) {
-        console.error('Ошибка записи в IndexedDB:', err);
+        window.LifeLog.error('LifeStorage', 'Критический сбой сохранения в IndexedDB', err);
       }
     }
 
     return true;
   },
 
-  // Создание снимка безопасности перед синхронизацией
   savePreSyncSnapshot(data) {
     try {
       localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({
         savedAt: Date.now(),
         data: data
       }));
-    } catch (_) {}
+      window.LifeLog.info('LifeStorage', 'Создан контрольный слепок безопасности перед синхронизацией.');
+    } catch (e) {
+      window.LifeLog.warn('LifeStorage', 'Не удалось сохранить снимок pre-sync', e);
+    }
   },
 
-  // Откат к снимку безопасности в случае сбоя
   restorePreSyncSnapshot() {
     try {
       const snap = localStorage.getItem(SNAPSHOT_KEY);
@@ -202,10 +284,13 @@ window.LifeStorage = {
         const parsed = JSON.parse(snap);
         if (parsed && parsed.data) {
           this.save(parsed.data);
+          window.LifeLog.info('LifeStorage', 'Откат к контрольному снимку безопасности выполнен.');
           return parsed.data;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      window.LifeLog.error('LifeStorage', 'Ошибка отката снимка', e);
+    }
     return null;
   }
 };

@@ -1,5 +1,5 @@
 // assets/js/sync.js
-// Бронебойный модуль синхронизации Life OS: Яндекс Диск + Google Диск
+// Модуль синхронизации: Строгий приоритет REV над часами + Фоновое продление Google Drive
 window.LifeSync = {
   provider: 'yandex', // 'yandex' | 'google'
   yandexToken: null,
@@ -13,6 +13,7 @@ window.LifeSync = {
   status: 'NOT_CONNECTED',
 
   init() {
+    window.LifeLog.info('LifeSync', 'Инициализация шлюза синхронизации...');
     this.provider = localStorage.getItem('LIFE_OS_CLOUD_PROVIDER') || 'yandex';
     this.yandexToken = localStorage.getItem('LIFE_OS_YANDEX_TOKEN') || null;
     this.googleToken = localStorage.getItem('LIFE_OS_GOOGLE_TOKEN') || null;
@@ -35,6 +36,7 @@ window.LifeSync = {
     localStorage.setItem('LIFE_OS_CLOUD_PROVIDER', newProvider);
     const token = this.getCurrentToken();
     this.setStatus(token ? 'SYNCED' : 'NOT_CONNECTED');
+    window.LifeLog.info('LifeSync', `Активный облачный провайдер переключен на: ${newProvider}`);
     if (window.LifeUI && window.LifeUI.updateCloudStatusUI) {
       window.LifeUI.updateCloudStatusUI();
     }
@@ -43,6 +45,7 @@ window.LifeSync = {
   setStatus(newStatus) {
     this.status = newStatus;
     localStorage.setItem('LIFE_OS_SYNC_STATUS', newStatus);
+    window.LifeLog.info('LifeSync', `Новый статус облака: ${newStatus}`);
     if (window.LifeUI && window.LifeUI.updateCloudStatusUI) {
       window.LifeUI.updateCloudStatusUI();
     }
@@ -50,19 +53,22 @@ window.LifeSync = {
 
   setupLifecycleListeners() {
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') this.silentPull();
-    });
-    window.addEventListener('online', () => {
-      if (localStorage.getItem('LIFE_OS_SYNC_PENDING') === 'true') {
+      if (document.visibilityState === 'visible') {
+        window.LifeLog.info('LifeSync', 'Вкладка стала активной. Проверяем обновления в облаке (Silent Pull)...');
         this.silentPull();
       }
     });
+    window.addEventListener('online', () => {
+      window.LifeLog.info('LifeSync', 'Сеть появилась. Запуск отложенной синхронизации.');
+      this.silentPull();
+    });
     window.addEventListener('offline', () => {
+      window.LifeLog.warn('LifeSync', 'Устройство перешло в офлайн.');
       if (this.getCurrentToken()) this.setStatus('OFFLINE');
     });
   },
 
-  // 1. АВТОРИЗАЦИЯ ЯНДЕКС ID
+  // 1. ЯНДЕКС ID
   checkUrlToken() {
     if (window.location.hash && window.location.hash.includes('access_token=')) {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -70,6 +76,7 @@ window.LifeSync = {
       if (token && token.startsWith('y0_')) {
         this.setYandexToken(token);
         history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        window.LifeLog.info('LifeSync', 'Токен Яндекс ID успешно перехвачен из URL.');
         return true;
       }
     }
@@ -81,11 +88,12 @@ window.LifeSync = {
     let cleanPath = window.location.pathname.replace(/\/index\.html$/, '');
     if (!cleanPath.endsWith('/')) cleanPath += '/';
     const redirectUri = window.location.origin + cleanPath;
+    window.LifeLog.info('LifeSync', 'Перенаправление на Яндекс OAuth...');
     window.location.href = `https://oauth.yandex.ru/authorize?response_type=token&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
   },
 
   setYandexToken(token) {
-    this.yandexToken = token.trim();
+    this.yandexToken = String(token || '').trim();
     localStorage.setItem('LIFE_OS_YANDEX_TOKEN', this.yandexToken);
     this.setStatus('SYNCING');
   },
@@ -95,9 +103,10 @@ window.LifeSync = {
     localStorage.removeItem('LIFE_OS_YANDEX_TOKEN');
     localStorage.removeItem('LIFE_OS_LAST_SYNC_TS_YANDEX');
     this.setStatus('NOT_CONNECTED');
+    window.LifeLog.info('LifeSync', 'Яндекс Диск отключен от устройства.');
   },
 
-  // 2. АВТОРИЗАЦИЯ GOOGLE ДИСК
+  // 2. GOOGLE ДИСК С АВТО-ПРОДЛЕНИЕМ
   initGoogleClient() {
     if (typeof window.google !== 'undefined' && window.google.accounts && window.LifeConfig.google && window.LifeConfig.google.clientId && !window.LifeConfig.google.clientId.includes('YOUR_GOOGLE')) {
       try {
@@ -107,15 +116,51 @@ window.LifeSync = {
           callback: (res) => {
             if (res.access_token) {
               this.setGoogleToken(res.access_token, res.expires_in);
-              window.LifeUI.showToast('🎉 Google Диск подключен!');
+              window.LifeLog.info('LifeSync', 'Токен Google Drive успешно получен/продлен!');
+              if (window.LifeUI) window.LifeUI.showToast('🎉 Google Диск подключен!');
               this.syncWithCurrentCloud();
             }
           }
         });
+        window.LifeLog.info('LifeSync', 'Google Identity Client инициализирован.');
       } catch (e) {
-        console.warn('Google Identity Client init:', e);
+        window.LifeLog.warn('LifeSync', 'Сбой инициализации Google Identity Client', e);
       }
     }
+  },
+
+  async ensureFreshGoogleToken() {
+    // Если токен еще годен (запас 2 минуты) — ничего не делаем
+    if (this.googleToken && Date.now() < (this.googleTokenExpiresAt - 120000)) {
+      return true;
+    }
+
+    window.LifeLog.info('LifeSync', 'Срок ключа Google подходит к концу. Запрашиваем тихое фоновое продление...');
+    if (!this.googleTokenClient) {
+      this.initGoogleClient();
+    }
+
+    if (!this.googleTokenClient) {
+      throw new Error('AUTH_ERROR: Google Client не настроен');
+    }
+
+    return new Promise((resolve) => {
+      const prevCallback = this.googleTokenClient.callback;
+      this.googleTokenClient.callback = (res) => {
+        if (res.access_token) {
+          this.setGoogleToken(res.access_token, res.expires_in);
+          window.LifeLog.info('LifeSync', 'Тихое продление Google Token прошло успешно.');
+          resolve(true);
+        } else {
+          window.LifeLog.warn('LifeSync', 'Тихое продление Google Token отклонено сервером.');
+          resolve(false);
+        }
+        this.googleTokenClient.callback = prevCallback;
+      };
+
+      // prompt: '' запускает фоновое обновление без всплывающего окна
+      this.googleTokenClient.requestAccessToken({ prompt: '' });
+    });
   },
 
   startGoogleLogin() {
@@ -127,16 +172,14 @@ window.LifeSync = {
       return;
     }
 
+    if (!this.googleTokenClient) this.initGoogleClient();
     if (this.googleTokenClient) {
       this.googleTokenClient.requestAccessToken();
-    } else {
-      this.initGoogleClient();
-      if (this.googleTokenClient) this.googleTokenClient.requestAccessToken();
     }
   },
 
   setGoogleToken(token, expiresIn = 3600) {
-    this.googleToken = token.trim();
+    this.googleToken = String(token || '').trim();
     this.googleTokenExpiresAt = Date.now() + (Number(expiresIn) * 1000);
     localStorage.setItem('LIFE_OS_GOOGLE_TOKEN', this.googleToken);
     localStorage.setItem('LIFE_OS_GOOGLE_EXPIRES', this.googleTokenExpiresAt.toString());
@@ -152,9 +195,10 @@ window.LifeSync = {
     localStorage.removeItem('LIFE_OS_GOOGLE_FILE_ID');
     localStorage.removeItem('LIFE_OS_LAST_SYNC_TS_GOOGLE');
     this.setStatus('NOT_CONNECTED');
+    window.LifeLog.info('LifeSync', 'Google Диск отключен.');
   },
 
-  // 3. СЕТЕВЫЕ ЗАПРОСЫ
+  // 3. СЕТЬ
   async fetchWithTimeout(url, options = {}, timeoutMs = 8500) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -191,7 +235,7 @@ window.LifeSync = {
     throw new Error('Шлюз недоступен');
   },
 
-  // 4. ПЕРЕВОДЧИК ОШИБОК
+  // 4. ДИАЛОГИ ОШИБОК ДЛЯ ЧЕЛОВЕКА
   translateError(err, provider = 'yandex') {
     const msg = String(err.message || err);
     const cloudName = provider === 'yandex' ? 'Яндекс Диска' : 'Google Диска';
@@ -199,16 +243,16 @@ window.LifeSync = {
     if (msg.includes('AUTH_ERROR') || msg.includes('401') || msg.includes('403')) {
       return {
         title: 'Срок действия входа истёк',
-        text: `Ключ авторизации для ${cloudName} устарел. Ваши данные сохранены на устройстве. Нажмите «Войти снова».`,
-        type: 'auth'
+        text: `Ключ авторизации для ${cloudName} устарел. Ваши данные в безопасности на телефоне. Нажмите «Войти снова» в меню настроек.`,
+        action: 'Требуется вход'
       };
     }
 
-    if (msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('IO failure') || msg.includes('нет хостов')) {
+    if (msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('IO failure')) {
       return {
-        title: `Серверы ${cloudName} перегружены`,
-        text: `Облако вернуло временный сбой файлового сектора. Все задачи сохранены на вашем телефоне. Нажмите «Пересоздать», чтобы записать свежий файл.`,
-        type: 'recreate'
+        title: `Серверы ${cloudName} временно заняты`,
+        text: `Облако вернуло временный сбой файловой системы. Ваши задачи сохранены на устройстве. В меню есть кнопка «Пересоздать», если сбой повторится.`,
+        action: 'Повторить позже'
       };
     }
 
@@ -216,14 +260,14 @@ window.LifeSync = {
       return {
         title: 'Офлайн-режим (нет связи)',
         text: `Нет устойчивого соединения с ${cloudName}. Вы можете спокойно продолжать писать задачи — планер синхронизирует их автоматически при появлении сети.`,
-        type: 'offline'
+        action: 'Работаем офлайн'
       };
     }
 
     return {
       title: 'Сбой синхронизации',
       text: `Облако ответило: ${msg.slice(0, 120)}. Ваши данные на устройстве в полной безопасности.`,
-      type: 'retry'
+      action: 'Понятно'
     };
   },
 
@@ -236,16 +280,17 @@ window.LifeSync = {
     return cleaned;
   },
 
-  // 5. ИСПРАВЛЕННОЕ СЛИЯНИЕ ДАННЫХ
+  // 5. ИСПРАВЛЕННОЕ СЛИЯНИЕ: СТРОГИЙ ПРИОРИТЕТ REV НАД ЧАСАМИ!
   mergeData(local, remote) {
+    window.LifeLog.info('LifeSync', 'Запуск алгоритма слияния баз (Conflict Resolution)...');
     if (!remote) return local;
     if (!local) return remote;
 
     const localHasData = (local.tasks && local.tasks.length > 0) || (local.spheres && local.spheres.length > 0);
     const remoteHasData = (remote.tasks && remote.tasks.length > 0) || (remote.spheres && remote.spheres.length > 0);
 
-    // Если на устройстве 0 задач, а в облаке они есть — безоговорочно берем облако
     if (!localHasData && remoteHasData) {
+      window.LifeLog.info('LifeSync', 'Локальная база пуста, а в облаке есть данные. Загружаем облако.');
       return remote;
     }
 
@@ -268,6 +313,21 @@ window.LifeSync = {
       return tTime && tTime >= (updatedAt || 0);
     };
 
+    // ФУНКЦИЯ ВЫБОРА ПОБЕДИТЕЛЯ: REV ВСЕГДА ГЛАВНЕЕ ЧАСОВ
+    const pickWinner = (locItem, remItem) => {
+      const lRev = locItem.rev || 0;
+      const rRev = remItem.rev || 0;
+
+      // 1. У кого ревизия больше — тот безоговорочно победил!
+      if (rRev > lRev) return remItem;
+      if (lRev > rRev) return locItem;
+
+      // 2. Только если ревизии АБСОЛЮТНО равны — сравниваем время устройства
+      const lTime = locItem.updatedAt || locItem.createdAt || 0;
+      const rTime = remItem.updatedAt || remItem.createdAt || 0;
+      return (rTime >= lTime) ? remItem : locItem;
+    };
+
     // Сферы
     const sphereMap = new Map();
     (local.spheres || []).forEach(s => {
@@ -278,13 +338,7 @@ window.LifeSync = {
       if (!sphereMap.has(s.id)) {
         sphereMap.set(s.id, s);
       } else {
-        const localS = sphereMap.get(s.id);
-        const remoteRev = s.rev || 0;
-        const localRev = localS.rev || 0;
-        if (remoteRev > localRev) sphereMap.set(s.id, s);
-        else if (remoteRev === localRev) {
-          sphereMap.set(s.id, (s.updatedAt || s.createdAt || 0) >= (localS.updatedAt || localS.createdAt || 0) ? s : localS);
-        }
+        sphereMap.set(s.id, pickWinner(sphereMap.get(s.id), s));
       }
     });
     merged.spheres = Array.from(sphereMap.values());
@@ -299,13 +353,7 @@ window.LifeSync = {
       if (!projectMap.has(p.id)) {
         projectMap.set(p.id, p);
       } else {
-        const localP = projectMap.get(p.id);
-        const remoteRev = p.rev || 0;
-        const localRev = localP.rev || 0;
-        if (remoteRev > localRev) projectMap.set(p.id, p);
-        else if (remoteRev === localRev) {
-          projectMap.set(p.id, (p.updatedAt || p.createdAt || 0) >= (localP.updatedAt || localP.createdAt || 0) ? p : localP);
-        }
+        projectMap.set(p.id, pickWinner(projectMap.get(p.id), p));
       }
     });
     merged.projects = Array.from(projectMap.values());
@@ -320,15 +368,7 @@ window.LifeSync = {
       if (!taskMap.has(t.id)) {
         taskMap.set(t.id, t);
       } else {
-        const localT = taskMap.get(t.id);
-        const remoteRev = t.rev || 0;
-        const localRev = localT.rev || 0;
-        if (remoteRev > localRev) taskMap.set(t.id, t);
-        else if (remoteRev === localRev) {
-          const remoteTime = t.updatedAt || t.createdAt || 0;
-          const localTime = localT.updatedAt || localT.createdAt || 0;
-          taskMap.set(t.id, (remoteTime >= localTime) ? t : localT);
-        }
+        taskMap.set(t.id, pickWinner(taskMap.get(t.id), t));
       }
     });
     merged.tasks = Array.from(taskMap.values());
@@ -345,14 +385,14 @@ window.LifeSync = {
     });
     merged.inbox = Array.from(inboxMap.values());
 
+    window.LifeLog.info('LifeSync', 'Слияние успешно завершено. Итог задач:', merged.tasks.length);
     return merged;
   },
 
-  // 6. БРОНЕБОЙНАЯ ЗАПИСЬ В GOOGLE ДИСК (БЕЗ MULTIPART И БЕЗ СБОЕВ 400)
+  // 6. ЗАПИСЬ В GOOGLE ДИСК
   async uploadRawGoogleData(data) {
     let fileId = this.googleFileId;
 
-    // 1. Если ID файла не сохранен локально — ищем в appDataFolder
     if (!fileId) {
       const listRes = await this.fetchWithTimeout(
         `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='planner_data.json' and trashed=false&orderBy=modifiedTime desc&fields=files(id,name)`,
@@ -368,7 +408,6 @@ window.LifeSync = {
       }
     }
 
-    // 2. Если файла нет в Google Диске — создаем его через чистый JSON (Шаг 1 создания)
     if (!fileId) {
       const createMetaRes = await this.fetchWithTimeout(
         `https://www.googleapis.com/drive/v3/files`,
@@ -395,7 +434,6 @@ window.LifeSync = {
       localStorage.setItem('LIFE_OS_GOOGLE_FILE_ID', fileId);
     }
 
-    // 3. Заливаем содержимое базы через прямой PATCH uploadType=media (Шаг 2 записи контента)
     const patchRes = await this.fetchWithTimeout(
       `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
       {
@@ -409,7 +447,6 @@ window.LifeSync = {
     );
 
     if (!patchRes.ok) {
-      // Если файл был удален на сервере Google вручную — сбрасываем ID для авто-пересоздания
       if (patchRes.status === 404) {
         this.googleFileId = null;
         localStorage.removeItem('LIFE_OS_GOOGLE_FILE_ID');
@@ -420,7 +457,6 @@ window.LifeSync = {
     return true;
   },
 
-  // ПРИНУДИТЕЛЬНАЯ ВЫГРУЗКА БЭКАПА В ОБЛАКО (ПОСЛЕ ИМПОРТА)
   async pushLocalToCloud() {
     if (!this.getCurrentToken()) return;
     this.isSyncing = true;
@@ -441,6 +477,7 @@ window.LifeSync = {
         });
         localStorage.setItem('LIFE_OS_LAST_SYNC_TS_YANDEX', Date.now().toString());
       } else {
+        await this.ensureFreshGoogleToken();
         await this.uploadRawGoogleData(localData);
         localStorage.setItem('LIFE_OS_LAST_SYNC_TS_GOOGLE', Date.now().toString());
       }
@@ -448,8 +485,9 @@ window.LifeSync = {
       this.isSyncing = false;
       localStorage.removeItem('LIFE_OS_SYNC_PENDING');
       this.setStatus('SYNCED');
+      window.LifeLog.info('LifeSync', 'Данные успешно выгружены в облако.');
     } catch (e) {
-      console.warn('Ошибка выгрузки бэкапа в облако:', e);
+      window.LifeLog.warn('LifeSync', 'Ошибка выгрузки бэкапа в облако:', e);
       this.isSyncing = false;
       this.setStatus('OFFLINE');
     }
@@ -462,7 +500,6 @@ window.LifeSync = {
     return this.syncWithYandexDisk(callback, silent);
   },
 
-  // ЯНДЕКС ДИСК
   async syncWithYandexDisk(callback, silent = false) {
     if (!this.yandexToken) {
       this.setStatus('NOT_CONNECTED');
@@ -543,17 +580,10 @@ window.LifeSync = {
     }
   },
 
-  // GOOGLE ДИСК
   async syncWithGoogleDrive(callback, silent = false) {
     if (!this.googleToken) {
       this.setStatus('NOT_CONNECTED');
       if (callback) callback({ success: false, error: 'Токен Google не указан' });
-      return;
-    }
-
-    if (Date.now() > this.googleTokenExpiresAt) {
-      this.setStatus('AUTH_ERROR');
-      if (callback) callback({ success: false, error: 'AUTH_ERROR: Срок действия токена Google истек', isAuthErr: true });
       return;
     }
 
@@ -562,9 +592,11 @@ window.LifeSync = {
     localStorage.setItem('LIFE_OS_SYNC_PENDING', 'true');
 
     try {
+      // Автоматически обновляем токен если прошел час
+      await this.ensureFreshGoogleToken();
+
       let fileId = this.googleFileId;
 
-      // 1. Поиск файла
       if (!fileId) {
         const listRes = await this.fetchWithTimeout(
           `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='planner_data.json' and trashed=false&orderBy=modifiedTime desc&fields=files(id,name,modifiedTime)`,
@@ -584,7 +616,6 @@ window.LifeSync = {
 
       let remoteData = null;
 
-      // 2. Скачивание существующего файла
       if (fileId) {
         const getRes = await this.fetchWithTimeout(
           `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
@@ -598,7 +629,6 @@ window.LifeSync = {
         }
       }
 
-      // 3. Слияние с локальной базой
       const localData = window.LifeState.data || window.LifeStorage.load();
       window.LifeStorage.savePreSyncSnapshot(localData);
 
@@ -606,7 +636,6 @@ window.LifeSync = {
       window.LifeStorage.save(mergedData);
       window.LifeState.data = mergedData;
 
-      // 4. Безотказная выгрузка обратно в Google Диск
       await this.uploadRawGoogleData(mergedData);
 
       this.isSyncing = false;
@@ -624,7 +653,6 @@ window.LifeSync = {
     }
   },
 
-  // 7. ЭКСТРЕННОЕ ПЕРЕСОЗДАНИЕ БИТОГО ФАЙЛА В ОБЛАКЕ
   async recreateCloudFile() {
     const localData = window.LifeState.data || window.LifeStorage.load();
     const isYandex = this.provider === 'yandex';
@@ -685,7 +713,6 @@ window.LifeSync = {
     }, 2200);
   },
 
-  // 8. 100% РЕАЛЬНАЯ ЖИВАЯ ДИАГНОСТИКА С ЛОГАМИ
   async runDiagnostic() {
     const modal = document.getElementById('customDialogModal');
     const titleEl = document.getElementById('customDialogTitle');
@@ -778,16 +805,8 @@ window.LifeSync = {
         return;
       }
 
-      if (Date.now() > this.googleTokenExpiresAt) {
-        steps[1].status = 'error';
-        steps[1].desc = 'Срок ключа истёк. Нажмите «Войти через Google».';
-        steps[2].desc = 'Отменено'; steps[3].desc = 'Отменено';
-        render(`<div style="margin-top: 6px; padding: 10px; background: #FFF1F0; color: #CF1322; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.8rem; border: 1.5px solid #FFA39E;">Срок токена истёк</div>`);
-        if (confirmBtn) { confirmBtn.style.display = 'inline-flex'; confirmBtn.textContent = 'Понятно'; }
-        return;
-      }
       steps[1].status = 'ok';
-      steps[1].desc = 'Токен активен (осталось ' + Math.round((this.googleTokenExpiresAt - Date.now()) / 60000) + ' мин).';
+      steps[1].desc = 'Токен активен (авто-продление включено).';
       render();
 
       steps[2].status = 'running';

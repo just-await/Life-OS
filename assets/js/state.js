@@ -1,11 +1,12 @@
 // assets/js/state.js
-// Модуль состояния данных (Local-First + Счетчики ревизий + Авто-сброс Фокуса)
+// Модуль состояния данных (Local-First + Строгие счетчики ревизий + Логирование)
 window.LifeState = {
   data: null,
   activeSphereId: null,
   activeProjectId: null,
 
   init() {
+    window.LifeLog.info('LifeState', 'Инициализация состояния приложения...');
     this.data = window.LifeStorage.load();
     this.setupCrossTabSync();
   },
@@ -13,6 +14,7 @@ window.LifeState = {
   setupCrossTabSync() {
     window.addEventListener('storage', (e) => {
       if (e.key === 'LIFE_OS_DATA_V1') {
+        window.LifeLog.info('LifeState', 'Обнаружены изменения в соседней вкладке браузера. Обновляем экран.');
         this.data = window.LifeStorage.load();
         if (window.LifeUI && !window.LifeUI.isDragging) {
           window.LifeUI.onSilentSyncCompleted();
@@ -31,6 +33,7 @@ window.LifeState = {
   recordTombstone(id) {
     if (!this.data.tombstones) this.data.tombstones = {};
     this.data.tombstones[id] = Date.now();
+    window.LifeLog.info('LifeState', `Элемент ${id} помечен на удаление (Tombstone).`);
   },
 
   // ===== СФЕРЫ =====
@@ -68,6 +71,7 @@ window.LifeState = {
 
     this.data.spheres.unshift(newSphere);
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Создана сфера: "${newSphere.title}"`, newSphere);
     return newSphere;
   },
 
@@ -80,6 +84,7 @@ window.LifeState = {
       updatedAt: Date.now() 
     });
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Сфера "${sphere.title}" обновлена. Новая rev: ${sphere.rev}`);
     return sphere;
   },
 
@@ -98,6 +103,7 @@ window.LifeState = {
     this.data.tasks = (this.data.tasks || []).filter(t => !projectIds.includes(t.projectId));
     
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Сфера ${sphereId} и все связанные проекты удалены.`);
   },
 
   // ===== ПРОЕКТЫ =====
@@ -137,6 +143,7 @@ window.LifeState = {
 
     this.data.projects.unshift(newProject);
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Создан проект: "${newProject.title}"`);
     return newProject;
   },
 
@@ -149,6 +156,7 @@ window.LifeState = {
       updatedAt: Date.now() 
     });
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Проект "${project.title}" обновлен. Новая rev: ${project.rev}`);
     return project;
   },
 
@@ -160,6 +168,7 @@ window.LifeState = {
     this.data.projects = (this.data.projects || []).filter(p => p.id !== projectId);
     this.data.tasks = (this.data.tasks || []).filter(t => t.projectId !== projectId);
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Проект ${projectId} удален.`);
   },
 
   // ===== ЗАДАЧИ =====
@@ -194,6 +203,7 @@ window.LifeState = {
 
     this.data.tasks.unshift(newTask);
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Добавлена задача: "${newTask.title}"`);
     return newTask;
   },
 
@@ -206,6 +216,7 @@ window.LifeState = {
       updatedAt: Date.now() 
     });
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Задача "${task.title}" обновлена. Rev: ${task.rev}`);
     return task;
   },
 
@@ -213,6 +224,7 @@ window.LifeState = {
     this.recordTombstone(taskId);
     this.data.tasks = (this.data.tasks || []).filter(t => t.id !== taskId);
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Задача ${taskId} удалена.`);
   },
 
   toggleTaskCompleted(taskId) {
@@ -223,6 +235,7 @@ window.LifeState = {
     task.rev = (task.rev || 0) + 1;
     task.updatedAt = Date.now();
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Статус задачи "${task.title}": ${task.completed ? 'Выполнена ✓' : 'Возвращена в работу'}`);
     return task;
   },
 
@@ -248,6 +261,7 @@ window.LifeState = {
     task.rev = (task.rev || 0) + 1;
     task.updatedAt = Date.now();
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Фокус задачи "${task.title}": ${task.inFocus ? 'В фокусе ⭐' : 'Снята с фокуса'}`);
     return task;
   },
 
@@ -376,6 +390,7 @@ window.LifeState = {
     });
     if (changed) {
       window.LifeStorage.save(this.data);
+      window.LifeLog.info('LifeState', 'Выполненные дела очищены из фокуса дня.');
     }
   },
 
@@ -393,6 +408,7 @@ window.LifeState = {
     };
     this.data.inbox.unshift(item);
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Записана мысль в инбокс: "${item.text}"`);
     return item;
   },
 
@@ -400,6 +416,7 @@ window.LifeState = {
     this.recordTombstone(id);
     this.data.inbox = (this.data.inbox || []).filter(item => item.id !== id);
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Мысль ${id} удалена из инбокса.`);
   },
 
   moveInboxThoughtToProject(inboxId, projectId) {
@@ -408,10 +425,11 @@ window.LifeState = {
 
     const task = this.addTask({ projectId, title: item.text });
     this.deleteInboxThought(inboxId);
+    window.LifeLog.info('LifeState', `Мысль из инбокса конвертирована в проект ${projectId}`);
     return task;
   },
 
-  // ===== БЕЗОПАСНАЯ СОРТИРОВКА И ПЕРЕТАСКИВАНИЕ =====
+  // ===== БРОНЕБОЙНАЯ СОРТИРОВКА И ПЕРЕТАСКИВАНИЕ (С ИНКРЕМЕНТОМ REV) =====
   _applyOrder(list, ids, belongs) {
     const own = list.filter(belongs);
     const map = new Map(own.map(x => [x.id, x]));
@@ -422,6 +440,8 @@ window.LifeState = {
       if (map.has(id) && !seen.has(id)) {
         seen.add(id);
         const item = map.get(id);
+        // ФИКС БАГА СИНХРОНИЗАЦИИ: Увеличиваем rev, чтобы облако приняло новый порядок!
+        item.rev = (item.rev || 0) + 1;
         item.updatedAt = Date.now();
         ordered.push(item);
       }
@@ -434,17 +454,19 @@ window.LifeState = {
   reorderSpheres(newOrderIds) {
     this.data.spheres = this._applyOrder(this.data.spheres || [], newOrderIds, () => true);
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', 'Порядок сфер обновлен (rev увеличен).');
   },
 
   reorderProjects(sphereId, newOrderIds) {
     this.data.projects = this._applyOrder(this.data.projects || [], newOrderIds, p => p.sphereId === sphereId);
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Порядок проектов в сфере ${sphereId} обновлен.`);
   },
 
-  // ИСПРАВЛЕННЫЙ БАГ: функция перетаскивания задач внутри проекта
   reorderTasks(projectId, newOrderIds) {
     this.data.tasks = this._applyOrder(this.data.tasks || [], newOrderIds, t => t.projectId === projectId);
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', `Порядок задач в проекте ${projectId} обновлен.`);
   },
 
   reorderGlobalTasks(newOrderIds) {
@@ -456,6 +478,7 @@ window.LifeState = {
       if (map.has(id) && !seen.has(id)) {
         seen.add(id);
         const item = map.get(id);
+        item.rev = (item.rev || 0) + 1;
         item.updatedAt = Date.now();
         ordered.push(item);
       }
@@ -464,6 +487,7 @@ window.LifeState = {
     const rest = (this.data.tasks || []).filter(t => !seen.has(t.id));
     this.data.tasks = [...ordered, ...rest];
     window.LifeStorage.save(this.data);
+    window.LifeLog.info('LifeState', 'Глобальный порядок задач фокуса дня обновлен.');
   },
 
   resetAll() {
@@ -478,5 +502,6 @@ window.LifeState = {
       resetAt: Date.now()
     };
     window.LifeStorage.save(this.data);
+    window.LifeLog.warn('LifeState', 'База данных полностью сброшена к пустому состоянию.');
   }
 };

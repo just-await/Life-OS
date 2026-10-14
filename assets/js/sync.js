@@ -241,6 +241,15 @@ window.LifeSync = {
     if (!remote) return local;
     if (!local) return remote;
 
+    // ПРЕДОХРАНИТЕЛЬ ПУСТОТЫ: если локальная база пуста, но пользователь не делал сброс (resetAt = 0),
+    // а в облаке есть данные — защищаем пользователя и берем данные из облака!
+    const localHasData = (local.tasks && local.tasks.length > 0) || (local.spheres && local.spheres.length > 0);
+    const remoteHasData = (remote.tasks && remote.tasks.length > 0) || (remote.spheres && remote.spheres.length > 0);
+    
+    if (!localHasData && remoteHasData && (!local.resetAt || local.resetAt === 0)) {
+      return remote;
+    }
+
     const localReset = local.resetAt || 0;
     const remoteReset = remote.resetAt || 0;
 
@@ -458,10 +467,9 @@ window.LifeSync = {
     try {
       let fileId = this.googleFileId;
 
-      // 1. Ищем файл в скрытой папке appDataFolder
       if (!fileId) {
         const listRes = await this.fetchWithTimeout(
-          `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='planner_data.json'&fields=files(id,name)`,
+          `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='planner_data.json' and trashed=false&orderBy=modifiedTime desc&fields=files(id,name,modifiedTime)`,
           { headers: { Authorization: `Bearer ${this.googleToken}` } }
         );
 

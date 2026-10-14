@@ -236,15 +236,19 @@ window.LifeSync = {
     return cleaned;
   },
 
-  // 5. ИСПРАВЛЕННОЕ СЛИЯНИЕ ДАННЫХ (БЕЗ УДАЛЕНИЯ БЭКАПОВ)
+  // 5. ИСПРАВЛЕННОЕ СЛИЯНИЕ ДАННЫХ С УЧЕТОМ ПОЛНОГО СБРОСА
   mergeData(local, remote) {
     if (!remote) return local;
     if (!local) return remote;
 
-    // Если на устройстве вообще нет задач, а в импорте/облаке есть — безоговорочно берем входящие
+    const localReset = local.resetAt || 0;
+    const remoteReset = remote.resetAt || 0;
+    const effectiveReset = Math.max(localReset, remoteReset);
+
+    // Восстанавливаем данные из облака на пустое устройство ТОЛЬКО если пользователь НЕ делал сброс (resetAt === 0)
     const localHasData = (local.tasks && local.tasks.length > 0) || (local.spheres && local.spheres.length > 0);
     const remoteHasData = (remote.tasks && remote.tasks.length > 0) || (remote.spheres && remote.spheres.length > 0);
-    if (!localHasData && remoteHasData) {
+    if (!localHasData && remoteHasData && effectiveReset === 0) {
       return remote;
     }
 
@@ -259,12 +263,15 @@ window.LifeSync = {
       tasks: [],
       inbox: [],
       tombstones: tombstones,
-      resetAt: Math.max(local.resetAt || 0, remote.resetAt || 0)
+      resetAt: effectiveReset
     };
 
+    // Задача считается удаленной, если есть метка tombstone ИЛИ если она старше момента полного сброса базы!
     const isDeleted = (id, updatedAt) => {
       const tTime = tombstones[id];
-      return tTime && tTime >= (updatedAt || 0);
+      if (tTime && tTime >= (updatedAt || 0)) return true;
+      if (effectiveReset > 0 && (updatedAt || 0) <= effectiveReset) return true;
+      return false;
     };
 
     // Сферы

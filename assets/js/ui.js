@@ -2179,7 +2179,7 @@ palette: [
 
     this.resetAllDataBtn.addEventListener('click', async () => {
       const confirmed = await this.customConfirm(
-        'Вы уверены, что хотите полностью стереть все данные? Все сферы, проекты, задачи и мысли в инбоксе будут удалены навсегда.',
+        'Вы уверены, что хотите полностью стереть все данные? База на устройстве и в подключенном облаке будет очищена.',
         'Полная очистка'
       );
 
@@ -2189,7 +2189,11 @@ palette: [
         this.showDashboard();
         this.renderInbox();
         this.showToast('База полностью очищена');
-        if (window.LifeSync) window.LifeSync.triggerAutoSync();
+
+        // Сразу выгружаем чистый сброс в подключенное облако (Яндекс или Google), чтобы стереть старые данные и там
+        if (window.LifeSync && window.LifeSync.pushLocalToCloud) {
+          window.LifeSync.pushLocalToCloud();
+        }
       }
     });
 

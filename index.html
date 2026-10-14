@@ -35,6 +35,9 @@
   <link rel="icon" type="image/png" href="assets/icons/icon.png">
   <link rel="apple-touch-icon" href="assets/icons/icon.png">
 
+  <!-- Официальная библиотека авторизации Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <!-- Шрифты: Unbounded + Golos Text -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -270,20 +273,27 @@
         <span id="cloudStatusBadge" style="color: var(--accent-done);">● 100% Локально</span>
       </div>
 
+      <!-- Секция: Облачная синхронизация (Яндекс + Google) -->
       <div class="backup-section-box">
-        <div class="backup-box-title">
-          <span style="white-space: nowrap; flex-shrink: 0;">🟡 Яндекс Диск</span>
-          <span id="yandexSyncLabel" class="sync-time-badge">Не подключен</span>
+        <div class="cloud-provider-tabs">
+          <button type="button" class="cloud-tab-btn active" id="tabProviderYandex">🟡 Яндекс Диск</button>
+          <button type="button" class="cloud-tab-btn" id="tabProviderGoogle">🔵 Google Диск</button>
         </div>
-        <p class="backup-box-desc">Приватная синхронизация через защищенную папку на вашем личном Диске.</p>
+
+        <div class="backup-box-title" style="margin-top: 4px;">
+          <span id="cloudProviderTitle" style="white-space: nowrap; flex-shrink: 0;">🟡 Яндекс Диск</span>
+          <span id="cloudSyncLabel" class="sync-time-badge">Не подключен</span>
+        </div>
+        <p class="backup-box-desc" id="cloudProviderDesc">Приватная синхронизация через защищенную папку на вашем Диске.</p>
         
+        <!-- БЛОК ЯНДЕКС: Не подключено -->
         <div id="yandexNotConnectedBlock" style="display: flex; flex-direction: column; gap: 8px;">
           <button type="button" class="neo-btn neo-btn-primary" id="loginYandexBtn" style="width: 100%;">
             ⚡ Войти через Яндекс ID
           </button>
           <div style="display: flex; gap: 6px;">
             <button type="button" class="neo-btn neo-btn-sm" id="manualYandexTokenBtn" style="flex: 1;">
-              🔑 Ввести токен
+              🔑 Токен
             </button>
             <button type="button" class="neo-btn neo-btn-sm" id="diagYandexBtn" style="flex: 1;" title="Проверить связь">
               🔍 Диагностика
@@ -291,6 +301,7 @@
           </div>
         </div>
 
+        <!-- БЛОК ЯНДЕКС: Подключено -->
         <div id="yandexConnectedBlock" style="display: none; flex-direction: column; gap: 8px;">
           <div style="display: flex; gap: 8px;">
             <button type="button" class="neo-btn neo-btn-primary neo-btn-sm" id="syncYandexNowBtn" style="flex: 1;">
@@ -300,9 +311,49 @@
               Отключить
             </button>
           </div>
-          <button type="button" class="neo-btn neo-btn-sm" id="diagYandexConnectedBtn" style="width: 100%;">
-            🔍 Проверить статус связи
+          <div style="display: flex; gap: 6px;">
+            <button type="button" class="neo-btn neo-btn-sm" id="diagYandexConnectedBtn" style="flex: 1;">
+              🔍 Диагностика
+            </button>
+            <button type="button" class="neo-btn neo-btn-sm" id="recreateYandexFileBtn" style="flex: 1;" title="Исправить битый файл в облаке">
+              🛠️ Пересоздать
+            </button>
+          </div>
+        </div>
+
+        <!-- БЛОК GOOGLE: Не подключено -->
+        <div id="googleNotConnectedBlock" style="display: none; flex-direction: column; gap: 8px;">
+          <button type="button" class="neo-btn neo-btn-primary" id="loginGoogleBtn" style="width: 100%; background: #4285F4; color: #FFF !important;">
+            🔵 Войти через Google
           </button>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" class="neo-btn neo-btn-sm" id="manualGoogleTokenBtn" style="flex: 1;">
+              🔑 Токен
+            </button>
+            <button type="button" class="neo-btn neo-btn-sm" id="diagGoogleBtn" style="flex: 1;">
+              🔍 Диагностика
+            </button>
+          </div>
+        </div>
+
+        <!-- БЛОК GOOGLE: Подключено -->
+        <div id="googleConnectedBlock" style="display: none; flex-direction: column; gap: 8px;">
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="neo-btn neo-btn-primary neo-btn-sm" id="syncGoogleNowBtn" style="flex: 1; background: #4285F4; color: #FFF !important;">
+              Синхронизировать 🔄
+            </button>
+            <button type="button" class="neo-btn neo-btn-sm" id="unlinkGoogleBtn" style="color: #CF1322;" title="Отвязать">
+              Отключить
+            </button>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" class="neo-btn neo-btn-sm" id="diagGoogleConnectedBtn" style="flex: 1;">
+              🔍 Диагностика
+            </button>
+            <button type="button" class="neo-btn neo-btn-sm" id="recreateGoogleFileBtn" style="flex: 1;" title="Исправить битый файл в облаке">
+              🛠️ Пересоздать
+            </button>
+          </div>
         </div>
       </div>
 

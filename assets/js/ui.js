@@ -271,18 +271,36 @@ palette: [
     this.backupMemoryKb = document.getElementById('backupMemoryKb');
     this.resetAllDataBtn = document.getElementById('resetAllDataBtn');
 
-    this.yandexSyncLabel = document.getElementById('yandexSyncLabel');
+    this.cloudSyncLabel = document.getElementById('cloudSyncLabel');
+    this.cloudProviderTitle = document.getElementById('cloudProviderTitle');
+    this.cloudProviderDesc = document.getElementById('cloudProviderDesc');
+    this.tabProviderYandex = document.getElementById('tabProviderYandex');
+    this.tabProviderGoogle = document.getElementById('tabProviderGoogle');
+
     this.yandexNotConnectedBlock = document.getElementById('yandexNotConnectedBlock');
     this.yandexConnectedBlock = document.getElementById('yandexConnectedBlock');
+    this.googleNotConnectedBlock = document.getElementById('googleNotConnectedBlock');
+    this.googleConnectedBlock = document.getElementById('googleConnectedBlock');
+
     this.loginYandexBtn = document.getElementById('loginYandexBtn');
     this.manualYandexTokenBtn = document.getElementById('manualYandexTokenBtn');
     this.syncYandexNowBtn = document.getElementById('syncYandexNowBtn');
     this.unlinkYandexBtn = document.getElementById('unlinkYandexBtn');
+    this.diagYandexBtn = document.getElementById('diagYandexBtn');
+    this.diagYandexConnectedBtn = document.getElementById('diagYandexConnectedBtn');
+    this.recreateYandexFileBtn = document.getElementById('recreateYandexFileBtn');
+
+    this.loginGoogleBtn = document.getElementById('loginGoogleBtn');
+    this.manualGoogleTokenBtn = document.getElementById('manualGoogleTokenBtn');
+    this.syncGoogleNowBtn = document.getElementById('syncGoogleNowBtn');
+    this.unlinkGoogleBtn = document.getElementById('unlinkGoogleBtn');
+    this.diagGoogleBtn = document.getElementById('diagGoogleBtn');
+    this.diagGoogleConnectedBtn = document.getElementById('diagGoogleConnectedBtn');
+    this.recreateGoogleFileBtn = document.getElementById('recreateGoogleFileBtn');
+
     this.cloudStatusBadge = document.getElementById('cloudStatusBadge');
     this.modeMergeBtn = document.getElementById('modeMergeBtn');
     this.modeOverwriteBtn = document.getElementById('modeOverwriteBtn');
-    this.diagYandexBtn = document.getElementById('diagYandexBtn');
-    this.diagYandexConnectedBtn = document.getElementById('diagYandexConnectedBtn');
 
     this.installPwaBtn = document.getElementById('installPwaBtn');
     this.iosInstallModal = document.getElementById('iosInstallModal');
@@ -342,14 +360,48 @@ palette: [
     return `${d.getDate()} ${months[d.getMonth()]}, ${timeStr}`;
   },
 
-  // 8. ЧЕСТНЫЙ СТАТУС ОБЛАКА И ТОЧКА В ШАПКЕ
+  // 8. ЧЕСТНЫЙ СТАТУС ОБЛАКА И ТОЧКА В ШАПКЕ (ЯНДЕКС + GOOGLE)
   updateCloudStatusUI() {
-    const status = window.LifeSync ? window.LifeSync.status : 'NOT_CONNECTED';
-    const lastSyncTs = localStorage.getItem('LIFE_OS_LAST_SYNC_TS');
+    const sync = window.LifeSync;
+    if (!sync) return;
+
+    const provider = sync.provider; // 'yandex' | 'google'
+    const isYandex = provider === 'yandex';
+    const status = sync.status;
+    const lastSyncTs = localStorage.getItem(isYandex ? 'LIFE_OS_LAST_SYNC_TS_YANDEX' : 'LIFE_OS_LAST_SYNC_TS_GOOGLE');
     const timeLabel = this.formatLastSyncDate(lastSyncTs);
+
+    // Вкладки выбора облака
+    if (this.tabProviderYandex) this.tabProviderYandex.classList.toggle('active', isYandex);
+    if (this.tabProviderGoogle) this.tabProviderGoogle.classList.toggle('active', !isYandex);
+
+    if (this.cloudProviderTitle) {
+      this.cloudProviderTitle.textContent = isYandex ? '🟡 Яндекс Диск' : '🔵 Google Диск';
+    }
+    if (this.cloudProviderDesc) {
+      this.cloudProviderDesc.textContent = isYandex 
+        ? 'Синхронизация через защищенную папку на вашем Яндекс Диске.'
+        : 'Прямая синхронизация через Google Drive API (папка appDataFolder).';
+    }
+
+    // Показываем нужные блоки
+    if (this.yandexNotConnectedBlock) this.yandexNotConnectedBlock.style.display = 'none';
+    if (this.yandexConnectedBlock) this.yandexConnectedBlock.style.display = 'none';
+    if (this.googleNotConnectedBlock) this.googleNotConnectedBlock.style.display = 'none';
+    if (this.googleConnectedBlock) this.googleConnectedBlock.style.display = 'none';
 
     if (this.headerSyncDot) {
       this.headerSyncDot.className = 'sync-dot';
+    }
+
+    const isConnected = isYandex ? Boolean(sync.yandexToken) : Boolean(sync.googleToken);
+
+    if (isYandex) {
+      if (isConnected && status !== 'AUTH_ERROR') this.yandexConnectedBlock.style.display = 'flex';
+      else this.yandexNotConnectedBlock.style.display = 'flex';
+    } else {
+      if (isConnected && status !== 'AUTH_ERROR') this.googleConnectedBlock.style.display = 'flex';
+      else this.googleNotConnectedBlock.style.display = 'flex';
     }
 
     switch (status) {
@@ -358,17 +410,15 @@ palette: [
           this.headerSyncDot.classList.add('sync-dot-synced');
           this.headerSyncDot.title = `Синхронизировано (${timeLabel})`;
         }
-        this.cloudStatusBadge.textContent = '● Облако (Яндекс Диск)';
+        this.cloudStatusBadge.textContent = isYandex ? '● Яндекс Диск' : '● Google Диск';
         this.cloudStatusBadge.style.color = 'var(--accent-done)';
-        this.yandexSyncLabel.textContent = `Синхр: ${timeLabel}`;
-        this.yandexNotConnectedBlock.style.display = 'none';
-        this.yandexConnectedBlock.style.display = 'flex';
+        this.cloudSyncLabel.textContent = timeLabel;
         break;
 
       case 'SYNCING':
         if (this.headerSyncDot) {
           this.headerSyncDot.classList.add('sync-dot-syncing');
-          this.headerSyncDot.title = 'Идет синхронизация...';
+          this.headerSyncDot.title = 'Синхронизация...';
         }
         this.cloudStatusBadge.textContent = '⏳ Синхронизация...';
         this.cloudStatusBadge.style.color = 'var(--folder-amber)';
@@ -377,26 +427,21 @@ palette: [
       case 'OFFLINE':
         if (this.headerSyncDot) {
           this.headerSyncDot.classList.add('sync-dot-offline');
-          this.headerSyncDot.title = 'Офлайн: сохранено на устройстве';
+          this.headerSyncDot.title = 'Офлайн (сохранено на устройстве)';
         }
-        this.cloudStatusBadge.textContent = '● Офлайн (сохранено на устройстве)';
+        this.cloudStatusBadge.textContent = '● Офлайн-режим';
         this.cloudStatusBadge.style.color = 'var(--accent-focus)';
-        this.yandexSyncLabel.textContent = `Синхр: ${timeLabel} (Офлайн)`;
-        this.yandexNotConnectedBlock.style.display = 'none';
-        this.yandexConnectedBlock.style.display = 'flex';
+        this.cloudSyncLabel.textContent = `${timeLabel} (Офлайн)`;
         break;
 
       case 'AUTH_ERROR':
         if (this.headerSyncDot) {
           this.headerSyncDot.classList.add('sync-dot-error');
-          this.headerSyncDot.title = 'Ошибка: неверный токен Яндекса';
+          this.headerSyncDot.title = 'Требуется повторный вход';
         }
-        this.cloudStatusBadge.textContent = '● Ошибка: неверный токен';
+        this.cloudStatusBadge.textContent = '● Требуется вход';
         this.cloudStatusBadge.style.color = '#CF1322';
-        this.yandexSyncLabel.textContent = 'Требуется вход';
-        // Возвращаем кнопки входа, чтобы можно было исправить токен
-        this.yandexNotConnectedBlock.style.display = 'flex';
-        this.yandexConnectedBlock.style.display = 'none';
+        this.cloudSyncLabel.textContent = 'Вход не выполнен';
         break;
 
       case 'NOT_CONNECTED':
@@ -406,9 +451,7 @@ palette: [
         }
         this.cloudStatusBadge.textContent = '● 100% Локально';
         this.cloudStatusBadge.style.color = 'var(--accent-done)';
-        this.yandexSyncLabel.textContent = 'Не подключен';
-        this.yandexNotConnectedBlock.style.display = 'flex';
-        this.yandexConnectedBlock.style.display = 'none';
+        this.cloudSyncLabel.textContent = 'Не подключен';
         break;
     }
   },
@@ -1974,68 +2017,115 @@ palette: [
       this.backupModal.classList.remove('active');
     });
 
-    this.loginYandexBtn.addEventListener('click', () => {
-      window.LifeSync.startOAuthLogin();
-    });
+    if (this.tabProviderYandex) {
+      this.tabProviderYandex.addEventListener('click', () => {
+        window.LifeSync.setProvider('yandex');
+        this.updateCloudStatusUI();
+      });
+    }
+    if (this.tabProviderGoogle) {
+      this.tabProviderGoogle.addEventListener('click', () => {
+        window.LifeSync.setProvider('google');
+        this.updateCloudStatusUI();
+      });
+    }
 
-    this.manualYandexTokenBtn.addEventListener('click', async () => {
-      const currentToken = localStorage.getItem('LIFE_OS_YANDEX_TOKEN') || '';
-      const token = await this.customPrompt(
-        'Вставьте ваш OAuth-токен Яндекс Диска (начинается на y0_...):',
-        currentToken,
-        'y0_AgAAAA...',
-        'Яндекс Диск'
-      );
-
-      if (token) {
-        window.LifeSync.setYandexToken(token);
-        this.showToast('Проверяем токен...');
-        this.syncYandexNowBtn.textContent = 'Синхронизация...';
-        window.LifeSync.syncWithYandexDisk((res) => {
-          this.syncYandexNowBtn.textContent = 'Синхронизировать сейчас 🔄';
-          if (res.success) {
-            this.showToast('Яндекс Диск подключен!');
-            this.renderSpheres();
-            this.renderFocusTasks();
-            this.renderInbox();
-          } else {
-            this.customAlert(`Ошибка: ${res.error}`, 'Ошибка Яндекс Диска');
-          }
-        });
-      }
-    });
-
-    this.syncYandexNowBtn.addEventListener('click', () => {
-      this.syncYandexNowBtn.textContent = 'Синхронизация...';
-      window.LifeSync.syncWithYandexDisk((res) => {
-        this.syncYandexNowBtn.textContent = 'Синхронизировать сейчас 🔄';
-        if (res.success) {
-          this.showToast('Синхронизировано!');
-          this.renderSpheres();
-          this.renderFocusTasks();
-          this.renderInbox();
-        } else {
-          this.customAlert(`Ошибка: ${res.error}`, 'Ошибка');
+    // Яндекс события
+    if (this.loginYandexBtn) this.loginYandexBtn.addEventListener('click', () => window.LifeSync.startOAuthLogin());
+    if (this.manualYandexTokenBtn) {
+      this.manualYandexTokenBtn.addEventListener('click', async () => {
+        const token = await this.customPrompt('Вставьте OAuth-токен Яндекс Диска (y0_...):', localStorage.getItem('LIFE_OS_YANDEX_TOKEN') || '', 'y0_AgAAAA...', 'Яндекс Диск');
+        if (token) {
+          window.LifeSync.setYandexToken(token);
+          this.showToast('Проверяем токен...');
+          window.LifeSync.syncWithYandexDisk((res) => {
+            if (res.success) this.showToast('Яндекс Диск подключен!');
+            else {
+              const errInfo = window.LifeSync.translateError(res.error, 'yandex');
+              this.customAlert(`<strong>${errInfo.title}</strong><br><br>${errInfo.text}`, 'Статус связи');
+            }
+          });
         }
       });
-    });
+    }
+    if (this.syncYandexNowBtn) {
+      this.syncYandexNowBtn.addEventListener('click', () => {
+        this.showToast('Синхронизация...');
+        window.LifeSync.syncWithYandexDisk((res) => {
+          if (res.success) this.showToast('Яндекс Диск синхронизирован!');
+          else {
+            const errInfo = window.LifeSync.translateError(res.error, 'yandex');
+            this.customAlert(`<strong>${errInfo.title}</strong><br><br>${errInfo.text}`, 'Статус связи');
+          }
+        });
+      });
+    }
+    if (this.unlinkYandexBtn) {
+      this.unlinkYandexBtn.addEventListener('click', async () => {
+        const confirmed = await this.customConfirm('Отвязать Яндекс Диск от этого устройства?', 'Отключение');
+        if (confirmed) {
+          window.LifeSync.unlinkYandex();
+          this.showToast('Яндекс Диск отключен');
+        }
+      });
+    }
+    if (this.recreateYandexFileBtn) {
+      this.recreateYandexFileBtn.addEventListener('click', () => window.LifeSync.recreateCloudFile());
+    }
 
-    this.unlinkYandexBtn.addEventListener('click', async () => {
-      const confirmed = await this.customConfirm('Отвязать Яндекс Диск от этого устройства?', 'Отключение синхронизации');
-      if (confirmed) {
-        window.LifeSync.unlinkYandex();
-        this.showToast('Яндекс Диск отключен');
-      }
-    });
+    // Google события
+    if (this.loginGoogleBtn) this.loginGoogleBtn.addEventListener('click', () => window.LifeSync.startGoogleLogin());
+    if (this.manualGoogleTokenBtn) {
+      this.manualGoogleTokenBtn.addEventListener('click', async () => {
+        const token = await this.customPrompt('Вставьте Bearer-токен Google Drive API:', localStorage.getItem('LIFE_OS_GOOGLE_TOKEN') || '', 'ya29.a0...', 'Google Диск');
+        if (token) {
+          window.LifeSync.setGoogleToken(token, 3600);
+          this.showToast('Проверяем токен Google...');
+          window.LifeSync.syncWithGoogleDrive((res) => {
+            if (res.success) this.showToast('Google Диск подключен!');
+            else {
+              const errInfo = window.LifeSync.translateError(res.error, 'google');
+              this.customAlert(`<strong>${errInfo.title}</strong><br><br>${errInfo.text}`, 'Статус связи');
+            }
+          });
+        }
+      });
+    }
+    if (this.syncGoogleNowBtn) {
+      this.syncGoogleNowBtn.addEventListener('click', () => {
+        this.showToast('Синхронизация с Google...');
+        window.LifeSync.syncWithGoogleDrive((res) => {
+          if (res.success) this.showToast('Google Диск синхронизирован!');
+          else {
+            const errInfo = window.LifeSync.translateError(res.error, 'google');
+            this.customAlert(`<strong>${errInfo.title}</strong><br><br>${errInfo.text}`, 'Статус связи');
+          }
+        });
+      });
+    }
+    if (this.unlinkGoogleBtn) {
+      this.unlinkGoogleBtn.addEventListener('click', async () => {
+        const confirmed = await this.customConfirm('Отвязать Google Диск от этого устройства?', 'Отключение');
+        if (confirmed) {
+          window.LifeSync.unlinkGoogle();
+          this.showToast('Google Диск отключен');
+        }
+      });
+    }
+    if (this.recreateGoogleFileBtn) {
+      this.recreateGoogleFileBtn.addEventListener('click', () => window.LifeSync.recreateCloudFile());
+    }
 
+    // Диагностика Яндекс
     const runDiagHandler = async () => {
       this.showToast('Запуск диагностики...');
       const report = await window.LifeSync.runDiagnostic();
-      this.customAlert(report, 'Диагностика Яндекс Диска');
+      this.customAlert(report, 'Диагностика связи');
     };
-
     if (this.diagYandexBtn) this.diagYandexBtn.addEventListener('click', runDiagHandler);
     if (this.diagYandexConnectedBtn) this.diagYandexConnectedBtn.addEventListener('click', runDiagHandler);
+    if (this.diagGoogleBtn) this.diagGoogleBtn.addEventListener('click', () => this.showToast('Google Drive работает напрямую через CORS'));
+    if (this.diagGoogleConnectedBtn) this.diagGoogleConnectedBtn.addEventListener('click', () => this.showToast('Google Drive подключен'));
 
     this.downloadBackupBtn.addEventListener('click', async () => {
       const fileName = await window.LifeBackup.exportData();

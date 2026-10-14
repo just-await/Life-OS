@@ -1,8 +1,9 @@
+// assets/js/config.js
 // Глобальные настройки Life OS
 window.LifeConfig = {
-  version: '1.5.0',
+  version: '2.0.0',
 
-  // Ссылка на донат (вставь сюда свою ссылку CloudTips, Boosty, чаевые Тинькофф и т.д.)
+  // Ссылка на донат / чаевые
   donationUrl: 'https://pay.cloudtips.ru/p/eafc4110',
 
   // Настройки Яндекс Диска
@@ -10,7 +11,13 @@ window.LifeConfig = {
     clientId: 'b8ac870907144a7ebdbcda02f5422fd7',
   },
 
-  // Настройки сети
+  // Настройки Google Диска (Google Identity Services)
+  // Для боевого использования укажи свой Client ID из Google Cloud Console
+  google: {
+    clientId: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
+  },
+
+  // Настройки шлюза Cloudflare для Яндекс Диска
   network: {
     proxyUrl: 'https://lifeos-proxy.jeanmanasaryan.workers.dev',
   },
@@ -21,6 +28,6 @@ window.LifeConfig = {
       if (typeof window.navigator.vibrate === 'function') {
         window.navigator.vibrate(ms);
       }
-    } catch (e) {}
+    } catch (_) {}
   }
 };

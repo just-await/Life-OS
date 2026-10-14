@@ -107,7 +107,7 @@ window.LifeSync = {
           callback: (res) => {
             if (res.access_token) {
               this.setGoogleToken(res.access_token, res.expires_in);
-              window.LifeUI.showToast('🎉 Google Диск успешно подключен!');
+              window.LifeUI.showToast('🎉 Google Диск подключен!');
               this.syncWithCurrentCloud();
             }
           }
@@ -121,7 +121,7 @@ window.LifeSync = {
   startGoogleLogin() {
     if (!window.LifeConfig.google || !window.LifeConfig.google.clientId || window.LifeConfig.google.clientId.includes('YOUR_GOOGLE')) {
       window.LifeUI.customAlert(
-        `Чтобы включить Google Диск, укажите ваш бесплатный <strong>Client ID</strong> в файле <code>assets/js/config.js</code>.`,
+        `Чтобы включить Google Диск, укажите ваш <strong>Client ID</strong> в файле <code>assets/js/config.js</code>.`,
         'Настройка Google Диска'
       );
       return;
@@ -244,8 +244,8 @@ window.LifeSync = {
     const localHasData = (local.tasks && local.tasks.length > 0) || (local.spheres && local.spheres.length > 0);
     const remoteHasData = (remote.tasks && remote.tasks.length > 0) || (remote.spheres && remote.spheres.length > 0);
 
-    // Если на устройстве 0 задач, а в облаке они есть — скачиваем, ТОЛЬКО если пользователь не делал осознанный сброс
-    if (!localHasData && remoteHasData && (!local.resetAt || local.resetAt === 0)) {
+    // Если на устройстве 0 задач, а в облаке они есть — безоговорочно берем облако
+    if (!localHasData && remoteHasData) {
       return remote;
     }
 
@@ -260,14 +260,12 @@ window.LifeSync = {
       tasks: [],
       inbox: [],
       tombstones: tombstones,
-      resetAt: Math.max(local.resetAt || 0, remote.resetAt || 0)
+      resetAt: 0
     };
 
     const isDeleted = (id, updatedAt) => {
       const tTime = tombstones[id];
-      if (tTime && tTime >= (updatedAt || 0)) return true;
-      if (merged.resetAt > 0 && (updatedAt || 0) <= merged.resetAt) return true;
-      return false;
+      return tTime && tTime >= (updatedAt || 0);
     };
 
     // Сферы
@@ -350,11 +348,11 @@ window.LifeSync = {
     return merged;
   },
 
-  // 6. ВСПОМОГАТЕЛЬНЫЙ МЕТОД: ЗАПИСЬ В GOOGLE ДИСК БЕЗ ПОТЕРЬ
+  // 6. БРОНЕБОЙНАЯ ЗАПИСЬ В GOOGLE ДИСК (БЕЗ MULTIPART И БЕЗ СБОЕВ 400)
   async uploadRawGoogleData(data) {
     let fileId = this.googleFileId;
 
-    // Если ID файла не сохранен в кэше — обязательно находим его в облаке!
+    // 1. Если ID файла не сохранен локально — ищем в appDataFolder
     if (!fileId) {
       const listRes = await this.fetchWithTimeout(
         `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='planner_data.json' and trashed=false&orderBy=modifiedTime desc&fields=files(id,name)`,
@@ -370,48 +368,59 @@ window.LifeSync = {
       }
     }
 
-    if (fileId) {
-      // Обновляем существующий файл
-      const patchRes = await this.fetchWithTimeout(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+    // 2. Если файла нет в Google Диске — создаем его через чистый JSON (Шаг 1 создания)
+    if (!fileId) {
+      const createMetaRes = await this.fetchWithTimeout(
+        `https://www.googleapis.com/drive/v3/files`,
         {
-          method: 'PATCH',
+          method: 'POST',
           headers: {
             Authorization: `Bearer ${this.googleToken}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(data)
+          body: JSON.stringify({
+            name: 'planner_data.json',
+            parents: ['appDataFolder']
+          })
         }
       );
-      if (patchRes.ok) return true;
+
+      if (!createMetaRes.ok) {
+        throw new Error(`Google API Create error: HTTP ${createMetaRes.status}`);
+      }
+
+      const createdMeta = await createMetaRes.json();
+      fileId = createdMeta.id;
+      this.googleFileId = fileId;
+      localStorage.setItem('LIFE_OS_GOOGLE_FILE_ID', fileId);
     }
 
-    // Если файла нет вообще — создаем новый в appDataFolder
-    const metadata = { name: 'planner_data.json', parents: ['appDataFolder'] };
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', new Blob([JSON.stringify(data)], { type: 'application/json' }));
-
-    const createRes = await this.fetchWithTimeout(
-      `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id`,
+    // 3. Заливаем содержимое базы через прямой PATCH uploadType=media (Шаг 2 записи контента)
+    const patchRes = await this.fetchWithTimeout(
+      `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
       {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${this.googleToken}` },
-        body: form
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${this.googleToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
       }
     );
 
-    if (createRes.ok) {
-      const created = await createRes.json();
-      this.googleFileId = created.id;
-      localStorage.setItem('LIFE_OS_GOOGLE_FILE_ID', created.id);
-      return true;
+    if (!patchRes.ok) {
+      // Если файл был удален на сервере Google вручную — сбрасываем ID для авто-пересоздания
+      if (patchRes.status === 404) {
+        this.googleFileId = null;
+        localStorage.removeItem('LIFE_OS_GOOGLE_FILE_ID');
+      }
+      throw new Error(`Google API Patch error: HTTP ${patchRes.status}`);
     }
 
-    throw new Error('Не удалось записать файл в Google Диск');
+    return true;
   },
 
-  // ПРИНУДИТЕЛЬНАЯ ВЫГРУЗКА БЭКАПА В ОБЛАКО (ПОСЛЕ ИМПОРТА ИЛИ СБРОСА)
+  // ПРИНУДИТЕЛЬНАЯ ВЫГРУЗКА БЭКАПА В ОБЛАКО (ПОСЛЕ ИМПОРТА)
   async pushLocalToCloud() {
     if (!this.getCurrentToken()) return;
     this.isSyncing = true;
@@ -555,6 +564,7 @@ window.LifeSync = {
     try {
       let fileId = this.googleFileId;
 
+      // 1. Поиск файла
       if (!fileId) {
         const listRes = await this.fetchWithTimeout(
           `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='planner_data.json' and trashed=false&orderBy=modifiedTime desc&fields=files(id,name,modifiedTime)`,
@@ -574,6 +584,7 @@ window.LifeSync = {
 
       let remoteData = null;
 
+      // 2. Скачивание существующего файла
       if (fileId) {
         const getRes = await this.fetchWithTimeout(
           `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
@@ -587,6 +598,7 @@ window.LifeSync = {
         }
       }
 
+      // 3. Слияние с локальной базой
       const localData = window.LifeState.data || window.LifeStorage.load();
       window.LifeStorage.savePreSyncSnapshot(localData);
 
@@ -594,6 +606,7 @@ window.LifeSync = {
       window.LifeStorage.save(mergedData);
       window.LifeState.data = mergedData;
 
+      // 4. Безотказная выгрузка обратно в Google Диск
       await this.uploadRawGoogleData(mergedData);
 
       this.isSyncing = false;
@@ -830,7 +843,6 @@ window.LifeSync = {
       }
 
     } else {
-      // ЯНДЕКС ТЕСТ 1: Токен
       steps[0].status = 'running';
       steps[0].desc = 'Проверка токена Яндекс ID...';
       render();
@@ -848,7 +860,6 @@ window.LifeSync = {
       steps[0].desc = 'Токен найден и загружен.';
       render();
 
-      // ЯНДЕКС ТЕСТ 2: Сеть
       steps[1].status = 'running';
       steps[1].desc = 'Запрос к cloud-api.yandex.net...';
       render();
@@ -871,7 +882,6 @@ window.LifeSync = {
       }
       render();
 
-      // ЯНДЕКС ТЕСТ 3: Шлюз
       steps[2].status = 'running';
       steps[2].desc = 'Тестирование шлюза Cloudflare...';
       render();
@@ -908,7 +918,6 @@ window.LifeSync = {
       }
       render();
 
-      // ЯНДЕКС ТЕСТ 4: Запись
       steps[3].status = 'running';
       steps[3].desc = 'Проверка разрешений на запись в хранилище...';
       render();

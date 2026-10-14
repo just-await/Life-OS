@@ -74,7 +74,7 @@ window.LifeBackup = {
       tasks: [],
       inbox: [],
       tombstones: raw.tombstones && typeof raw.tombstones === 'object' ? raw.tombstones : {},
-      resetAt: 0 // Всегда сбрасываем барьер очистки при импорте бэкапа!
+      resetAt: 0
     };
 
     const isValidColor = (c) => typeof c === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(c);
@@ -148,34 +148,76 @@ window.LifeBackup = {
         const sanitizedRemote = this.sanitizeData(remoteData);
 
         const now = Date.now();
-
-        // Повышаем ревизию и актуализируем время импортированных сущностей,
-        // чтобы они побеждали любые старые облачные удаления
-        sanitizedRemote.spheres.forEach(s => { s.updatedAt = now; s.rev = (s.rev || 0) + 10; });
-        sanitizedRemote.projects.forEach(p => { p.updatedAt = now; p.rev = (p.rev || 0) + 10; });
-        sanitizedRemote.tasks.forEach(t => { t.updatedAt = now; t.rev = (t.rev || 0) + 10; });
-
         let finalData;
 
         if (mode === 'overwrite') {
-          finalData = sanitizedRemote;
-          finalData.resetAt = 0;
-          finalData.tombstones = {};
+          // РЕЖИМ ПЕРЕЗАПИСИ: бэкап становится абсолютной истиной
+          sanitizedRemote.spheres.forEach(s => { s.updatedAt = now; s.rev = (s.rev || 0) + 10; });
+          sanitizedRemote.projects.forEach(p => { p.updatedAt = now; p.rev = (p.rev || 0) + 10; });
+          sanitizedRemote.tasks.forEach(t => { t.updatedAt = now; t.rev = (t.rev || 0) + 10; });
+
+          finalData = {
+            schemaVersion: 1,
+            isOnboarding: false,
+            spheres: sanitizedRemote.spheres,
+            projects: sanitizedRemote.projects,
+            tasks: sanitizedRemote.tasks,
+            inbox: sanitizedRemote.inbox,
+            tombstones: {},
+            resetAt: 0
+          };
         } else {
-          // РЕЖИМ СЛИЯНИЯ
+          // РЕЖИМ УМНОГО СЛИЯНИЯ: объединяем карты данных напрямую без блокировки tombstones
           const currentLocal = window.LifeState.data || window.LifeStorage.load();
-          currentLocal.resetAt = 0; // Снимаем барьер сброса
 
-          // Удаляем метки смерти для всех импортируемых задач
-          if (currentLocal.tombstones) {
-            sanitizedRemote.tasks.forEach(t => delete currentLocal.tombstones[t.id]);
-            sanitizedRemote.projects.forEach(p => delete currentLocal.tombstones[p.id]);
-            sanitizedRemote.spheres.forEach(s => delete currentLocal.tombstones[s.id]);
-            sanitizedRemote.inbox.forEach(i => delete currentLocal.tombstones[i.id]);
-          }
+          const sphereMap = new Map((currentLocal.spheres || []).map(s => [s.id, s]));
+          const projectMap = new Map((currentLocal.projects || []).map(p => [p.id, p]));
+          const taskMap = new Map((currentLocal.tasks || []).map(t => [t.id, t]));
+          const inboxMap = new Map((currentLocal.inbox || []).map(i => [i.id, i]));
 
-          finalData = window.LifeSync ? window.LifeSync.mergeData(currentLocal, sanitizedRemote) : sanitizedRemote;
-          finalData.resetAt = 0;
+          // Вливаем сферы из бэкапа
+          (sanitizedRemote.spheres || []).forEach(s => {
+            s.updatedAt = now;
+            s.rev = (s.rev || 0) + 10;
+            sphereMap.set(s.id, s);
+          });
+
+          // Вливаем проекты из бэкапа
+          (sanitizedRemote.projects || []).forEach(p => {
+            p.updatedAt = now;
+            p.rev = (p.rev || 0) + 10;
+            projectMap.set(p.id, p);
+          });
+
+          // Вливаем задачи из бэкапа
+          (sanitizedRemote.tasks || []).forEach(t => {
+            t.updatedAt = now;
+            t.rev = (t.rev || 0) + 10;
+            taskMap.set(t.id, t);
+          });
+
+          // Вливаем инбокс
+          (sanitizedRemote.inbox || []).forEach(i => {
+            inboxMap.set(i.id, i);
+          });
+
+          // Снимаем метки смерти для всех импортированных элементов
+          const cleanTombstones = { ...(currentLocal.tombstones || {}) };
+          sphereMap.forEach((_, id) => delete cleanTombstones[id]);
+          projectMap.forEach((_, id) => delete cleanTombstones[id]);
+          taskMap.forEach((_, id) => delete cleanTombstones[id]);
+          inboxMap.forEach((_, id) => delete cleanTombstones[id]);
+
+          finalData = {
+            schemaVersion: 1,
+            isOnboarding: false,
+            spheres: Array.from(sphereMap.values()),
+            projects: Array.from(projectMap.values()),
+            tasks: Array.from(taskMap.values()),
+            inbox: Array.from(inboxMap.values()),
+            tombstones: cleanTombstones,
+            resetAt: 0
+          };
         }
 
         window.LifeStorage.save(finalData);

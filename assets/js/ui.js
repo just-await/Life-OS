@@ -708,7 +708,6 @@ palette: [
       if (task.deadline) {
         badgesHtml += `<span class="task-property-badge">📅 ${this.formatDate(task.deadline)}</span>`;
       }
-      // ОТОБРАЖАЕМ СВОЙСТВО "НА НЕДЕЛЮ" НА КАРТОЧКЕ ЗАДАЧИ
       if (task.inWeek) {
         badgesHtml += `<span class="task-property-badge">🗓️ На неделе</span>`;
       }
@@ -735,8 +734,10 @@ palette: [
             <button class="inline-checklist-toggle" data-toggle-id="${toggleKey}">
               ☑️ Подзадачи (${done}/${total}) <span class="chevron">${isOpen ? '▲' : '▼'}</span>
             </button>
-            <div class="inline-checklist-body" id="chkbody-${toggleKey}" style="display: ${isOpen ? 'flex' : 'none'};">
-              ${listItems}
+            <div class="inline-checklist-body ${isOpen ? 'open' : ''}" id="chkbody-${toggleKey}">
+              <div class="inline-checklist-inner">
+                ${listItems}
+              </div>
             </div>
           </div>
         `;
@@ -813,17 +814,18 @@ palette: [
       });
     });
 
+    // Плавное открытие/закрытие аккордеона
     this.projectTasksList.querySelectorAll('.inline-checklist-toggle').forEach(btn => {
       btn.addEventListener('click', () => {
         const toggleKey = btn.getAttribute('data-toggle-id');
         const body = document.getElementById(`chkbody-${toggleKey}`);
         const chev = btn.querySelector('.chevron');
-        if (body.style.display === 'none') {
-          body.style.display = 'flex';
+        if (!body.classList.contains('open')) {
+          body.classList.add('open');
           chev.textContent = '▲';
           this.openChecklistIds.add(toggleKey);
         } else {
-          body.style.display = 'none';
+          body.classList.remove('open');
           chev.textContent = '▼';
           this.openChecklistIds.delete(toggleKey);
         }
@@ -1061,17 +1063,18 @@ palette: [
       });
     });
 
+    // Плавное открытие/закрытие аккордеона в Фокусе дня
     this.focusList.querySelectorAll('.inline-checklist-toggle').forEach(btn => {
       btn.addEventListener('click', () => {
         const toggleKey = btn.getAttribute('data-toggle-id');
         const body = document.getElementById(`chkbody-${toggleKey}`);
         const chev = btn.querySelector('.chevron');
-        if (body.style.display === 'none') {
-          body.style.display = 'flex';
+        if (!body.classList.contains('open')) {
+          body.classList.add('open');
           chev.textContent = '▲';
           this.openChecklistIds.add(toggleKey);
         } else {
-          body.style.display = 'none';
+          body.classList.remove('open');
           chev.textContent = '▼';
           this.openChecklistIds.delete(toggleKey);
         }
@@ -1125,9 +1128,8 @@ palette: [
         badgesHtml += `<span class="task-property-badge" style="background: var(--folder-amber); color: #141414;">🔥 Сегодня</span>`;
       } else if (task.deadline) {
         badgesHtml += `<span class="task-property-badge">📅 ${this.formatDate(task.deadline)}</span>`;
-      } else if (task.inWeek) {
-        badgesHtml += `<span class="task-property-badge">🗓️ В планах недели</span>`;
       }
+      // ПЛАШКУ "В ПЛАНАХ НЕДЕЛИ" ОТСЮДА УБРАЛИ ДЛЯ ЧИСТОТЫ ЭКРАНА
 
       if (task.note && task.note.trim()) {
         badgesHtml += `<span class="task-property-badge">📝</span>`;
@@ -1152,8 +1154,10 @@ palette: [
             <button class="inline-checklist-toggle" data-toggle-id="${toggleKey}">
               ☑️ Подзадачи (${done}/${total}) <span class="chevron">${isOpen ? '▲' : '▼'}</span>
             </button>
-            <div class="inline-checklist-body" id="chkbody-${toggleKey}" style="display: ${isOpen ? 'flex' : 'none'};">
-              ${listItems}
+            <div class="inline-checklist-body ${isOpen ? 'open' : ''}" id="chkbody-${toggleKey}">
+              <div class="inline-checklist-inner">
+                ${listItems}
+              </div>
             </div>
           </div>
         `;
@@ -1187,7 +1191,6 @@ palette: [
   },
 
   bindWeekEvents() {
-    // 1. Выполнение задачи из списка недели
     const checkboxes = this.weekList.querySelectorAll('.chk-week-task');
     checkboxes.forEach(box => {
       box.addEventListener('change', (e) => {
@@ -1208,7 +1211,6 @@ palette: [
       });
     });
 
-    // 2. Открытие карточки задачи
     const titles = this.weekList.querySelectorAll('.open-week-task-modal');
     titles.forEach(el => {
       el.addEventListener('click', () => {
@@ -1217,7 +1219,6 @@ palette: [
       });
     });
 
-    // 3. Звездочка: взять задачу недели прямо в Сегодня!
     const starButtons = this.weekList.querySelectorAll('.toggle-week-focus-btn');
     starButtons.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1229,18 +1230,18 @@ palette: [
       });
     });
 
-    // 4. Аккордеоны подзадач
+    // Плавное открытие/закрытие аккордеона в табе Недели
     this.weekList.querySelectorAll('.inline-checklist-toggle').forEach(btn => {
       btn.addEventListener('click', () => {
         const toggleKey = btn.getAttribute('data-toggle-id');
         const body = document.getElementById(`chkbody-${toggleKey}`);
         const chev = btn.querySelector('.chevron');
-        if (body.style.display === 'none') {
-          body.style.display = 'flex';
+        if (!body.classList.contains('open')) {
+          body.classList.add('open');
           chev.textContent = '▲';
           this.openChecklistIds.add(toggleKey);
         } else {
-          body.style.display = 'none';
+          body.classList.remove('open');
           chev.textContent = '▼';
           this.openChecklistIds.delete(toggleKey);
         }

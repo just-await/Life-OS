@@ -715,12 +715,18 @@ palette: [
         badgesHtml += `<span class="task-property-badge">📝</span>`;
       }
 
-      let inlineChecklistHtml = '';
+      let inlineChecklistBodyHtml = '';
       if (task.checklist && task.checklist.length > 0) {
         const done = task.checklist.filter(s => s.completed).length;
         const total = task.checklist.length;
         const toggleKey = `proj-${safeTaskId}`;
         const isOpen = this.openChecklistIds && this.openChecklistIds.has(toggleKey);
+
+        badgesHtml += `
+          <button type="button" class="inline-checklist-toggle" data-toggle-id="${toggleKey}">
+            ☑️ ${done}/${total} <span class="chevron">${isOpen ? '▲' : '▼'}</span>
+          </button>
+        `;
 
         const listItems = task.checklist.map((c, idx) => `
           <div class="inline-subtask-row ${c.completed ? 'completed' : ''}">
@@ -729,15 +735,10 @@ palette: [
           </div>
         `).join('');
 
-        inlineChecklistHtml = `
-          <div class="inline-checklist-wrap">
-            <button class="inline-checklist-toggle" data-toggle-id="${toggleKey}">
-              ☑️ Подзадачи (${done}/${total}) <span class="chevron">${isOpen ? '▲' : '▼'}</span>
-            </button>
-            <div class="inline-checklist-body ${isOpen ? 'open' : ''}" id="chkbody-${toggleKey}">
-              <div class="inline-checklist-inner">
-                ${listItems}
-              </div>
+        inlineChecklistBodyHtml = `
+          <div class="inline-checklist-body ${isOpen ? 'open' : ''}" id="chkbody-${toggleKey}">
+            <div class="inline-checklist-inner">
+              ${listItems}
             </div>
           </div>
         `;
@@ -757,7 +758,7 @@ palette: [
               <div class="task-badges-left">${badgesHtml}</div>
             </div>
           ` : ''}
-          ${inlineChecklistHtml}
+          ${inlineChecklistBodyHtml}
         </div>
       `;
     }).join('');
@@ -957,7 +958,6 @@ palette: [
           badgesHtml += `<span class="task-property-badge">📅 ${this.formatDate(task.deadline)}</span>`;
         }
 
-        // Мягкий бейдж переноса (Вчера / 2 дня / 3 дня)
         if (task.rolloverText) {
           badgesHtml += `<span class="task-property-badge" style="background: var(--bg-card); color: var(--ink-muted); border-style: dashed;">⏳ ${task.rolloverText}</span>`;
         }
@@ -966,12 +966,19 @@ palette: [
           badgesHtml += `<span class="task-property-badge">📝</span>`;
         }
 
-        let inlineChecklistHtml = '';
+        // Кнопка подзадач встраивается ВНУТРЬ строки бейджей
+        let inlineChecklistBodyHtml = '';
         if (task.checklist && task.checklist.length > 0) {
           const done = task.checklist.filter(s => s.completed).length;
           const total = task.checklist.length;
           const toggleKey = `foc-${safeTaskId}`;
           const isOpen = this.openChecklistIds && this.openChecklistIds.has(toggleKey);
+
+          badgesHtml += `
+            <button type="button" class="inline-checklist-toggle" data-toggle-id="${toggleKey}">
+              ☑️ ${done}/${total} <span class="chevron">${isOpen ? '▲' : '▼'}</span>
+            </button>
+          `;
 
           const listItems = task.checklist.map((c, idx) => `
             <div class="inline-subtask-row ${c.completed ? 'completed' : ''}">
@@ -980,12 +987,9 @@ palette: [
             </div>
           `).join('');
 
-          inlineChecklistHtml = `
-            <div class="inline-checklist-wrap" style="width:100%;">
-              <button class="inline-checklist-toggle" data-toggle-id="${toggleKey}">
-                ☑️ Подзадачи (${done}/${total}) <span class="chevron">${isOpen ? '▲' : '▼'}</span>
-              </button>
-              <div class="inline-checklist-body" id="chkbody-${toggleKey}" style="display: ${isOpen ? 'flex' : 'none'};">
+          inlineChecklistBodyHtml = `
+            <div class="inline-checklist-body ${isOpen ? 'open' : ''}" id="chkbody-${toggleKey}">
+              <div class="inline-checklist-inner">
                 ${listItems}
               </div>
             </div>
@@ -993,7 +997,7 @@ palette: [
         }
 
         return `
-          <div class="task-item ${task.completed ? 'task-completed' : ''}" data-task-id="${safeTaskId}">
+          <div class="task-item ${task.completed ? 'task-completed' : ''}" draggable="true" data-task-id="${safeTaskId}">
             <div class="task-main-row">
               <input type="checkbox" class="task-checkbox chk-focus-task" id="chk-${safeTaskId}" ${task.completed ? 'checked' : ''} aria-label="Отметить выполненной">
               <span class="task-text open-focus-task-modal" data-task-id="${safeTaskId}">${safeTitle}</span>
@@ -1009,15 +1013,21 @@ palette: [
                 ${safeProject}
               </span>
             </div>
-            ${inlineChecklistHtml}
+            ${inlineChecklistBodyHtml}
           </div>
         `;
       }).join('');
     }
 
     this.bindFocusEvents();
-    
-    // ВЫЗЫВАЕМ ОБНОВЛЕНИЕ СЧЕТЧИКА И СПИСКА 7 ДНЕЙ ПРИ КАЖДОЙ ПЕРЕРИСОВКЕ
+
+    // ВКЛЮЧАЕМ ПЕРЕТАСКИВАНИЕ ДЛЯ ФОКУСА ДНЯ
+    this.setupGridDragAndDrop(this.focusList, '.task-item', 'data-task-id', (order) => {
+      window.LifeState.reorderGlobalTasks(order);
+      this.renderFocusTasks();
+      if (window.LifeSync) window.LifeSync.triggerAutoSync();
+    });
+
     this.renderWeekTasks();
   },
 
@@ -1129,18 +1139,23 @@ palette: [
       } else if (task.deadline) {
         badgesHtml += `<span class="task-property-badge">📅 ${this.formatDate(task.deadline)}</span>`;
       }
-      // ПЛАШКУ "В ПЛАНАХ НЕДЕЛИ" ОТСЮДА УБРАЛИ ДЛЯ ЧИСТОТЫ ЭКРАНА
 
       if (task.note && task.note.trim()) {
         badgesHtml += `<span class="task-property-badge">📝</span>`;
       }
 
-      let inlineChecklistHtml = '';
+      let inlineChecklistBodyHtml = '';
       if (task.checklist && task.checklist.length > 0) {
         const done = task.checklist.filter(s => s.completed).length;
         const total = task.checklist.length;
         const toggleKey = `wk-${safeTaskId}`;
         const isOpen = this.openChecklistIds && this.openChecklistIds.has(toggleKey);
+
+        badgesHtml += `
+          <button type="button" class="inline-checklist-toggle" data-toggle-id="${toggleKey}">
+            ☑️ ${done}/${total} <span class="chevron">${isOpen ? '▲' : '▼'}</span>
+          </button>
+        `;
 
         const listItems = task.checklist.map((c, idx) => `
           <div class="inline-subtask-row ${c.completed ? 'completed' : ''}">
@@ -1149,22 +1164,17 @@ palette: [
           </div>
         `).join('');
 
-        inlineChecklistHtml = `
-          <div class="inline-checklist-wrap" style="width:100%;">
-            <button class="inline-checklist-toggle" data-toggle-id="${toggleKey}">
-              ☑️ Подзадачи (${done}/${total}) <span class="chevron">${isOpen ? '▲' : '▼'}</span>
-            </button>
-            <div class="inline-checklist-body ${isOpen ? 'open' : ''}" id="chkbody-${toggleKey}">
-              <div class="inline-checklist-inner">
-                ${listItems}
-              </div>
+        inlineChecklistBodyHtml = `
+          <div class="inline-checklist-body ${isOpen ? 'open' : ''}" id="chkbody-${toggleKey}">
+            <div class="inline-checklist-inner">
+              ${listItems}
             </div>
           </div>
         `;
       }
 
       return `
-        <div class="task-item" data-task-id="${safeTaskId}">
+        <div class="task-item" draggable="true" data-task-id="${safeTaskId}">
           <div class="task-main-row">
             <input type="checkbox" class="task-checkbox chk-week-task" id="chk-wk-${safeTaskId}" aria-label="Выполнить задачу">
             <span class="task-text open-week-task-modal" data-task-id="${safeTaskId}">${safeTitle}</span>
@@ -1182,12 +1192,19 @@ palette: [
               ${safeProject}
             </span>
           </div>
-          ${inlineChecklistHtml}
+          ${inlineChecklistBodyHtml}
         </div>
       `;
     }).join('');
 
     this.bindWeekEvents();
+
+    // ВКЛЮЧАЕМ ПЕРЕТАСКИВАНИЕ ДЛЯ 7 ДНЕЙ
+    this.setupGridDragAndDrop(this.weekList, '.task-item', 'data-task-id', (order) => {
+      window.LifeState.reorderGlobalTasks(order);
+      this.renderWeekTasks();
+      if (window.LifeSync) window.LifeSync.triggerAutoSync();
+    });
   },
 
   bindWeekEvents() {

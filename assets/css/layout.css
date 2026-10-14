@@ -176,8 +176,8 @@ body {
 .task-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: 6px;
+  padding: 9px 12px;
   background-color: var(--bg-subcard);
   border: var(--border-width) solid var(--border-color);
   border-radius: 12px;
@@ -733,18 +733,34 @@ body {
   margin-top: 4px;
 }
 .inline-checklist-toggle {
-  background: transparent;
-  border: none;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 1px 7px;
   font-family: var(--font-body);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  color: var(--ink-muted);
+  color: var(--ink-black);
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 2px;
+  gap: 4px;
+  line-height: 1.4;
+  user-select: none;
+  box-shadow: 1px 1px 0 var(--shadow-color);
+  transition: transform var(--transition-tactile), background-color var(--transition-tactile);
 }
+
+[data-theme="dark"] .inline-checklist-toggle {
+  background-color: var(--bg-beige);
+  color: #1D130E;
+}
+
+.inline-checklist-toggle:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 0 0 0;
+}
+
 .inline-checklist-body {
   display: flex;
   flex-direction: column;

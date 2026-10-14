@@ -430,8 +430,25 @@ window.LifeState = {
     window.LifeStorage.save(this.data);
   },
 
-  reorderTasks(projectId, newOrderIds) {
-    this.data.tasks = this._applyOrder(this.data.tasks || [], newOrderIds, t => t.projectId === projectId);
+  reorderGlobalTasks(newOrderIds) {
+    const map = new Map((this.data.tasks || []).map(t => [t.id, t]));
+    const seen = new Set();
+    const ordered = [];
+
+    // 1. Ставим отсортированные пользователем задачи в новом порядке
+    for (const id of newOrderIds) {
+      if (map.has(id) && !seen.has(id)) {
+        seen.add(id);
+        const item = map.get(id);
+        item.updatedAt = Date.now();
+        ordered.push(item);
+      }
+    }
+
+    // 2. Добавляем остальные задачи без изменений
+    const rest = (this.data.tasks || []).filter(t => !seen.has(t.id));
+
+    this.data.tasks = [...ordered, ...rest];
     window.LifeStorage.save(this.data);
   },
 

@@ -243,23 +243,35 @@ window.LifeSync = {
     throw new Error('Шлюз недоступен');
   },
 
-  // 4. ФУНДАМЕНТАЛЬНЫЙ АЛГОРИТМ СЛИЯНИЯ БАЗ (С АБСОЛЮТНЫМИ TOMBSTONES)
+  // 4. АРХИТЕКТУРА ЭПОХ (EPOCH SYNC ENGINE)
   mergeData(local, remote) {
     window.LifeLog.info('LifeSync', '════════════════ НАЧАЛО СЛИЯНИЯ ДАННЫХ ════════════════');
-    if (!remote) {
-      window.LifeLog.info('LifeSync', 'Облачная база пуста. Принимаем локальную базу как основу.');
-      return local;
-    }
+    if (!remote) return local;
     if (!local) return remote;
 
-    // Объединяем ВСЕ метки удаления (локальные имеют абсолютный приоритет)
-    const tombstones = { ...(remote.tombstones || {}), ...(local.tombstones || {}) };
-    const deadCount = Object.keys(tombstones).length;
-    window.LifeLog.info('LifeSync', `Загружен реестр удаленных объектов (Tombstones). Всего меток: ${deadCount}`);
+    const localEpoch = Number(local.resetEpoch) || 0;
+    const remoteEpoch = Number(remote.resetEpoch) || 0;
 
-    const isDead = (id) => {
-      return Boolean(tombstones[id]);
-    };
+    // СЦЕНАРИЙ А: В облаке произошел сброс или импорт бэкапа более новой эпохи!
+    if (remoteEpoch > localEpoch) {
+      window.LifeLog.warn('LifeSync', `⚡ Обнаружена новая Эпоха в облаке (remote: ${remoteEpoch} > local: ${localEpoch}). Локальная база полностью обновляется под облако!`);
+      if (window.LifeUI && window.LifeUI.showToast) {
+        window.LifeUI.showToast('🔄 Данные синхронизированы с новой версией из облака');
+      }
+      return remote;
+    }
+
+    // СЦЕНАРИЙ Б: На этом устройстве сбросили базу или восстановили бэкап (наша эпоха новее)!
+    if (localEpoch > remoteEpoch) {
+      window.LifeLog.warn('LifeSync', `⚡ Локальная Эпоха новее облачной (local: ${localEpoch} > remote: ${remoteEpoch}). Облако будет перезаписано текущими данными!`);
+      return local;
+    }
+
+    // СЦЕНАРИЙ В: Мы находимся в одной эпохе — производим классическое слияние задач
+    window.LifeLog.info('LifeSync', `Устройства в одной эпохе (Epoch: ${localEpoch}). Выполняем точечное слияние изменений.`);
+
+    const tombstones = { ...(remote.tombstones || {}), ...(local.tombstones || {}) };
+    const isDead = (id) => Boolean(tombstones[id]);
 
     const merged = {
       schemaVersion: 1,
@@ -269,7 +281,8 @@ window.LifeSync = {
       tasks: [],
       inbox: [],
       tombstones: tombstones,
-      resetAt: 0
+      resetEpoch: localEpoch,
+      resetAt: Math.max(Number(local.resetAt) || 0, Number(remote.resetAt) || 0)
     };
 
     // ФУНКЦИЯ ВЫБОРА ПОБЕДИТЕЛЯ (СТРОГИЙ ПРИОРИТЕТ REV)

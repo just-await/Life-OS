@@ -150,8 +150,11 @@ window.LifeBackup = {
         const now = Date.now();
         let finalData;
 
+        const currentLocal = window.LifeState.data || window.LifeStorage.load();
+        // При импорте бэкапа создаем НОВУЮ ЭПОХУ, которая главнее любых прошлых сбросов!
+        const nextEpoch = Math.max(Number(currentLocal.resetEpoch) || 0, Number(sanitizedRemote.resetEpoch) || 0) + 1;
+
         if (mode === 'overwrite') {
-          // РЕЖИМ ПЕРЕЗАПИСИ: бэкап становится абсолютной истиной
           sanitizedRemote.spheres.forEach(s => { s.updatedAt = now; s.rev = (s.rev || 0) + 10; });
           sanitizedRemote.projects.forEach(p => { p.updatedAt = now; p.rev = (p.rev || 0) + 10; });
           sanitizedRemote.tasks.forEach(t => { t.updatedAt = now; t.rev = (t.rev || 0) + 10; });
@@ -164,44 +167,37 @@ window.LifeBackup = {
             tasks: sanitizedRemote.tasks,
             inbox: sanitizedRemote.inbox,
             tombstones: {},
-            resetAt: 0
+            resetEpoch: nextEpoch,
+            resetAt: now
           };
         } else {
-          // РЕЖИМ УМНОГО СЛИЯНИЯ: объединяем карты данных напрямую без блокировки tombstones
-          const currentLocal = window.LifeState.data || window.LifeStorage.load();
-
           const sphereMap = new Map((currentLocal.spheres || []).map(s => [s.id, s]));
           const projectMap = new Map((currentLocal.projects || []).map(p => [p.id, p]));
           const taskMap = new Map((currentLocal.tasks || []).map(t => [t.id, t]));
           const inboxMap = new Map((currentLocal.inbox || []).map(i => [i.id, i]));
 
-          // Вливаем сферы из бэкапа
           (sanitizedRemote.spheres || []).forEach(s => {
             s.updatedAt = now;
             s.rev = (s.rev || 0) + 10;
             sphereMap.set(s.id, s);
           });
 
-          // Вливаем проекты из бэкапа
           (sanitizedRemote.projects || []).forEach(p => {
             p.updatedAt = now;
             p.rev = (p.rev || 0) + 10;
             projectMap.set(p.id, p);
           });
 
-          // Вливаем задачи из бэкапа
           (sanitizedRemote.tasks || []).forEach(t => {
             t.updatedAt = now;
             t.rev = (t.rev || 0) + 10;
             taskMap.set(t.id, t);
           });
 
-          // Вливаем инбокс
           (sanitizedRemote.inbox || []).forEach(i => {
             inboxMap.set(i.id, i);
           });
 
-          // Снимаем метки смерти для всех импортированных элементов
           const cleanTombstones = { ...(currentLocal.tombstones || {}) };
           sphereMap.forEach((_, id) => delete cleanTombstones[id]);
           projectMap.forEach((_, id) => delete cleanTombstones[id]);
@@ -216,9 +212,11 @@ window.LifeBackup = {
             tasks: Array.from(taskMap.values()),
             inbox: Array.from(inboxMap.values()),
             tombstones: cleanTombstones,
-            resetAt: 0
+            resetEpoch: nextEpoch,
+            resetAt: now
           };
         }
+        window.LifeLog.info('LifeBackup', `Импорт завершен. Базе присвоена новая Эпоха: [${nextEpoch}]`);
 
         window.LifeStorage.save(finalData);
         window.LifeState.data = finalData;

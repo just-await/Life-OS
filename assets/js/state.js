@@ -491,6 +491,7 @@ window.LifeState = {
   },
 
   resetAll() {
+    const nextEpoch = (Number(this.data.resetEpoch) || 0) + 1;
     this.data = {
       schemaVersion: 1,
       isOnboarding: false,
@@ -499,9 +500,10 @@ window.LifeState = {
       tasks: [],
       inbox: [],
       tombstones: {},
+      resetEpoch: nextEpoch, // Переход в новую эпоху сброса
       resetAt: Date.now()
     };
     window.LifeStorage.save(this.data);
-    window.LifeLog.warn('LifeState', 'База данных полностью сброшена к пустому состоянию.');
+    window.LifeLog.warn('LifeState', `База данных сброшена. Наступила новая Эпоха: [${nextEpoch}]`);
   }
 };

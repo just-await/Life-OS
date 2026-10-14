@@ -74,7 +74,7 @@ window.LifeBackup = {
       tasks: [],
       inbox: [],
       tombstones: raw.tombstones && typeof raw.tombstones === 'object' ? raw.tombstones : {},
-      resetAt: typeof raw.resetAt === 'number' ? raw.resetAt : 0
+      resetAt: 0 // Всегда сбрасываем барьер очистки при импорте бэкапа!
     };
 
     const isValidColor = (c) => typeof c === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(c);
@@ -112,9 +112,9 @@ window.LifeBackup = {
         projectId: String(t.projectId || ''),
         title: t.title.slice(0, 150),
         completed: Boolean(t.completed),
-        completedAt: Number(t.completedAt) || null, // Сохраняем дату выполнения
+        completedAt: Number(t.completedAt) || null,
         inFocus: Boolean(t.inFocus),
-        focusedAt: Number(t.focusedAt) || null,     // Сохраняем точный момент взятия в фокус!
+        focusedAt: Number(t.focusedAt) || null,
         inWeek: Boolean(t.inWeek),
         deadline: typeof t.deadline === 'string' ? t.deadline.slice(0, 20) : null,
         note: typeof t.note === 'string' ? t.note.slice(0, 1000) : '',
@@ -147,12 +147,35 @@ window.LifeBackup = {
         const remoteData = parsed.data ? parsed.data : parsed;
         const sanitizedRemote = this.sanitizeData(remoteData);
 
+        const now = Date.now();
+
+        // Повышаем ревизию и актуализируем время импортированных сущностей,
+        // чтобы они побеждали любые старые облачные удаления
+        sanitizedRemote.spheres.forEach(s => { s.updatedAt = now; s.rev = (s.rev || 0) + 10; });
+        sanitizedRemote.projects.forEach(p => { p.updatedAt = now; p.rev = (p.rev || 0) + 10; });
+        sanitizedRemote.tasks.forEach(t => { t.updatedAt = now; t.rev = (t.rev || 0) + 10; });
+
         let finalData;
-        if (mode === 'merge' && window.LifeSync) {
-          const currentLocal = window.LifeState.data || window.LifeStorage.load();
-          finalData = window.LifeSync.mergeData(currentLocal, sanitizedRemote);
-        } else {
+
+        if (mode === 'overwrite') {
           finalData = sanitizedRemote;
+          finalData.resetAt = 0;
+          finalData.tombstones = {};
+        } else {
+          // РЕЖИМ СЛИЯНИЯ
+          const currentLocal = window.LifeState.data || window.LifeStorage.load();
+          currentLocal.resetAt = 0; // Снимаем барьер сброса
+
+          // Удаляем метки смерти для всех импортируемых задач
+          if (currentLocal.tombstones) {
+            sanitizedRemote.tasks.forEach(t => delete currentLocal.tombstones[t.id]);
+            sanitizedRemote.projects.forEach(p => delete currentLocal.tombstones[p.id]);
+            sanitizedRemote.spheres.forEach(s => delete currentLocal.tombstones[s.id]);
+            sanitizedRemote.inbox.forEach(i => delete currentLocal.tombstones[i.id]);
+          }
+
+          finalData = window.LifeSync ? window.LifeSync.mergeData(currentLocal, sanitizedRemote) : sanitizedRemote;
+          finalData.resetAt = 0;
         }
 
         window.LifeStorage.save(finalData);
@@ -161,7 +184,7 @@ window.LifeBackup = {
         callback({ success: true, count: finalData.tasks.length, mode });
       } catch (err) {
         console.error('Ошибка импорта бэкапа:', err);
-        callback({ success: false, error: err.message || 'Файл поврежден или имеет неверный формат' });
+        callback({ success: false, error: err.message || 'Файл поврежден' });
       }
     };
 

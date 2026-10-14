@@ -2157,15 +2157,17 @@ palette: [
       const confirmed = await this.customConfirm(`Запустить восстановление файла в режиме «${modeText}»?`, 'Восстановление базы');
 
       if (confirmed) {
-        window.LifeBackup.importFromFile(file, this.currentImportMode, (res) => {
+        window.LifeBackup.importFromFile(file, this.currentImportMode, async (res) => {
           if (res.success) {
             this.showToast(`Восстановлено! Задач: ${res.count}`);
             this.backupModal.classList.remove('active');
             this.showDashboard();
             this.renderInbox();
-            // КРИТИЧЕСКИЙ ФИКС: сразу выгружаем импортированный бэкап в облако!
+
+            // СРАЗУ выгружаем импортированный бэкап в облако (Google или Яндекс),
+            // чтобы облако обновилось и никогда не затерло наш файл!
             if (window.LifeSync && window.LifeSync.pushLocalToCloud) {
-              window.LifeSync.pushLocalToCloud();
+              await window.LifeSync.pushLocalToCloud();
             }
           } else {
             this.customAlert(`Ошибка: ${res.error}`, 'Сбой восстановления');

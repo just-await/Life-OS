@@ -1,5 +1,5 @@
-// Service Worker Life OS — v9
-const CACHE_NAME = 'life-os-offline-v9';
+// assets/sw.js — Service Worker Life OS v2.0
+const CACHE_NAME = 'life-os-v2.0-' + '2026-10-14';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -9,12 +9,14 @@ const ASSETS_TO_CACHE = [
   './assets/css/neobrutalism.css',
   './assets/css/layout.css',
   './assets/css/modal.css',
+  './assets/js/config.js',
   './assets/js/icons.js',
   './assets/js/confetti.js',
   './assets/js/storage.js',
   './assets/js/state.js',
   './assets/js/backup.js',
   './assets/js/sync.js',
+  './assets/js/viral.js',
   './assets/js/ui.js',
   './assets/js/app.js',
   './assets/icons/icon.png'
@@ -31,9 +33,7 @@ self.addEventListener('install', (event) => {
             if (response.ok) {
               await cache.put(url, response);
             }
-          } catch (err) {
-            console.warn('[SW] Ошибка кэширования:', url);
-          }
+          } catch (_) {}
         })
       );
     })
@@ -55,47 +55,31 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
 
-  // Кэширование веб-шрифтов
-  if (requestUrl.hostname === 'fonts.googleapis.com' || requestUrl.hostname === 'fonts.gstatic.com') {
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request).then((response) => {
-          if (response && response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        }).catch(() => caches.match(event.request));
-      })
-    );
-    return;
-  }
-
-  // Запросы к сторонним сервисам (Яндекс Диск) НЕ перехватываем
+  // Игнорируем сетевые запросы к Яндекс Диску
   if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
-  if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
+  // Навигация (переход на страницы): сеть с откатом на кэш
+  if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
         .then(async (response) => {
           if (response && response.ok) {
             const cache = await caches.open(CACHE_NAME);
-            cache.put(event.request, response.clone());
             cache.put('./index.html', response.clone());
           }
           return response;
         })
         .catch(async () => {
           const cache = await caches.open(CACHE_NAME);
-          return (await cache.match(event.request)) || (await cache.match('./index.html')) || (await cache.match('index.html'));
+          return (await cache.match('./index.html')) || (await cache.match('index.html'));
         })
     );
     return;
   }
 
+  // Локальные ресурсы: быстрый кэш с обновлением в фоне
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {

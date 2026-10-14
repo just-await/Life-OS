@@ -1,3 +1,4 @@
+// assets/js/backup.js
 // Модуль резервного копирования и портируемости данных (Local-First)
 window.LifeBackup = {
   async exportData() {
@@ -16,7 +17,6 @@ window.LifeBackup = {
     const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
     const filename = `life_os_backup_${dateStr}_${timeStr}.json`;
 
-    // 1. Проводник с выбором папки (ПК / Chrome / Edge)
     if ('showSaveFilePicker' in window) {
       try {
         const handle = await window.showSaveFilePicker({
@@ -31,13 +31,12 @@ window.LifeBackup = {
         await writable.close();
         return filename;
       } catch (err) {
-        if (err.name === 'AbortError') return null; // Пользователь сам отменил диалог
+        if (err.name === 'AbortError') return null;
       }
     }
 
     const blob = new Blob([jsonString], { type: 'application/json' });
 
-    // 2. Системное мобильное меню «Сохранить в Файлы / Диск» (Android & iOS)
     if (navigator.canShare) {
       const file = new File([blob], filename, { type: 'application/json' });
       if (navigator.canShare({ files: [file] })) {
@@ -53,7 +52,6 @@ window.LifeBackup = {
       }
     }
 
-    // 3. Fallback: классическое скачивание, если система совсем старая
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -89,6 +87,7 @@ window.LifeBackup = {
         title: s.title.slice(0, 50),
         icon: isValidIcon(s.icon) ? s.icon : 'folder',
         color: isValidColor(s.color) ? s.color : '#FFD027',
+        rev: typeof s.rev === 'number' ? s.rev : 1,
         createdAt: Number(s.createdAt) || Date.now(),
         updatedAt: Number(s.updatedAt) || Date.now()
       }));
@@ -101,6 +100,7 @@ window.LifeBackup = {
         title: p.title.slice(0, 60),
         icon: isValidIcon(p.icon) ? p.icon : 'target',
         color: isValidColor(p.color) ? p.color : '#FFD027',
+        rev: typeof p.rev === 'number' ? p.rev : 1,
         createdAt: Number(p.createdAt) || Date.now(),
         updatedAt: Number(p.updatedAt) || Date.now()
       }));
@@ -112,11 +112,15 @@ window.LifeBackup = {
         projectId: String(t.projectId || ''),
         title: t.title.slice(0, 150),
         completed: Boolean(t.completed),
+        completedAt: Number(t.completedAt) || null, // Сохраняем дату выполнения
         inFocus: Boolean(t.inFocus),
+        focusedAt: Number(t.focusedAt) || null,     // Сохраняем точный момент взятия в фокус!
+        inWeek: Boolean(t.inWeek),
         deadline: typeof t.deadline === 'string' ? t.deadline.slice(0, 20) : null,
         note: typeof t.note === 'string' ? t.note.slice(0, 1000) : '',
         unfocusedDate: typeof t.unfocusedDate === 'string' ? t.unfocusedDate : null,
         checklist: Array.isArray(t.checklist) ? t.checklist.map(c => ({ text: String(c.text || '').slice(0, 100), completed: Boolean(c.completed) })) : [],
+        rev: typeof t.rev === 'number' ? t.rev : 1,
         createdAt: Number(t.createdAt) || Date.now(),
         updatedAt: Number(t.updatedAt) || Date.now()
       }));

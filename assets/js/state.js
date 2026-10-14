@@ -1,4 +1,5 @@
-// Модуль состояния данных (Local-First + Безопасная сортировка + Авто-сброс Фокуса)
+// assets/js/state.js
+// Модуль состояния данных (Local-First + Счетчики ревизий + Авто-сброс Фокуса)
 window.LifeState = {
   data: null,
   activeSphereId: null,
@@ -60,11 +61,12 @@ window.LifeState = {
       title: title.trim(),
       icon: icon || 'folder',
       color: color || '#FFD027',
+      rev: 1,
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
 
-    this.data.spheres.unshift(newSphere); // Добавляем на первое место
+    this.data.spheres.unshift(newSphere);
     window.LifeStorage.save(this.data);
     return newSphere;
   },
@@ -73,7 +75,10 @@ window.LifeState = {
     const sphere = this.getSphere(sphereId);
     if (!sphere) return null;
 
-    Object.assign(sphere, updates, { updatedAt: Date.now() });
+    Object.assign(sphere, updates, { 
+      rev: (sphere.rev || 0) + 1,
+      updatedAt: Date.now() 
+    });
     window.LifeStorage.save(this.data);
     return sphere;
   },
@@ -125,11 +130,12 @@ window.LifeState = {
       title: title.trim(),
       icon: icon || 'target',
       color: color || '#FFD027',
+      rev: 1,
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
 
-    this.data.projects.unshift(newProject); // Добавляем на первое место
+    this.data.projects.unshift(newProject);
     window.LifeStorage.save(this.data);
     return newProject;
   },
@@ -138,7 +144,10 @@ window.LifeState = {
     const project = this.getProject(projectId);
     if (!project) return null;
 
-    Object.assign(project, updates, { updatedAt: Date.now() });
+    Object.assign(project, updates, { 
+      rev: (project.rev || 0) + 1,
+      updatedAt: Date.now() 
+    });
     window.LifeStorage.save(this.data);
     return project;
   },
@@ -178,6 +187,7 @@ window.LifeState = {
       checklist: [],
       note: '',
       unfocusedDate: null,
+      rev: 1,
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
@@ -191,7 +201,10 @@ window.LifeState = {
     const task = this.getTask(taskId);
     if (!task) return null;
 
-    Object.assign(task, updates, { updatedAt: Date.now() });
+    Object.assign(task, updates, { 
+      rev: (task.rev || 0) + 1,
+      updatedAt: Date.now() 
+    });
     window.LifeStorage.save(this.data);
     return task;
   },
@@ -207,6 +220,7 @@ window.LifeState = {
     if (!task) return null;
     task.completed = !task.completed;
     task.completedAt = task.completed ? Date.now() : null;
+    task.rev = (task.rev || 0) + 1;
     task.updatedAt = Date.now();
     window.LifeStorage.save(this.data);
     return task;
@@ -227,16 +241,17 @@ window.LifeState = {
       }
     } else {
       task.inFocus = true;
-      task.focusedAt = Date.now(); // Фиксируем точное время входа в фокус
+      task.focusedAt = Date.now();
       task.unfocusedDate = null;
     }
 
+    task.rev = (task.rev || 0) + 1;
     task.updatedAt = Date.now();
     window.LifeStorage.save(this.data);
     return task;
   },
 
-  // ===== ФОКУС ДНЯ С АВТО-СБРОСОМ В ПОЛНОЧЬ =====
+  // ===== ФОКУС ДНЯ С АВТО-СБРОСОМ =====
   getFocusTasks() {
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -244,28 +259,30 @@ window.LifeState = {
 
     let modified = false;
     (this.data.tasks || []).forEach(t => {
-      // 1. Очистка выполненных вчера дел
+      // 1. Очистка вчерашних выполненных
       if (t.inFocus && t.completed && t.completedAt) {
         const compDate = new Date(t.completedAt);
         const compDateStr = `${compDate.getFullYear()}-${String(compDate.getMonth() + 1).padStart(2, '0')}-${String(compDate.getDate()).padStart(2, '0')}`;
         if (compDateStr < todayStr) {
           t.inFocus = false;
           t.focusedAt = null;
+          t.rev = (t.rev || 0) + 1;
           t.updatedAt = Date.now();
           modified = true;
         }
       }
 
-      // 2. ЗАБОТЛИВЫЙ АВТО-ВОЗВРАТ НА 4-Й ДЕНЬ (если дело не сделано за 3 дня)
+      // 2. Мягкий возврат в проект на 4-й день
       if (t.inFocus && !t.completed) {
         const focusedTime = t.focusedAt || t.createdAt || Date.now();
         const fDate = new Date(focusedTime);
         const focusedMidnight = new Date(fDate.getFullYear(), fDate.getMonth(), fDate.getDate()).getTime();
-        const daysDiff = Math.floor((todayMidnight - focusedMidnight) / (24 * 60 * 60 * 1000));
+        const daysDiff = Math.round((todayMidnight - focusedMidnight) / (24 * 60 * 60 * 1000));
 
         if (daysDiff >= 4) {
-          t.inFocus = false; // Мягко возвращаем в родной проект
+          t.inFocus = false;
           t.focusedAt = null;
+          t.rev = (t.rev || 0) + 1;
           t.updatedAt = Date.now();
           modified = true;
         }
@@ -286,13 +303,12 @@ window.LifeState = {
       const sphere = project ? (this.data.spheres || []).find(s => s.id === project.sphereId) : null;
       const isDueToday = t.deadline === todayStr;
 
-      // Мягкий бейдж давности (Вчера / 2 дня / 3 дня)
       let rolloverText = null;
       if (!t.completed) {
         const focusedTime = t.focusedAt || t.createdAt || Date.now();
         const fDate = new Date(focusedTime);
         const focusedMidnight = new Date(fDate.getFullYear(), fDate.getMonth(), fDate.getDate()).getTime();
-        const daysDiff = Math.floor((todayMidnight - focusedMidnight) / (24 * 60 * 60 * 1000));
+        const daysDiff = Math.round((todayMidnight - focusedMidnight) / (24 * 60 * 60 * 1000));
         if (daysDiff === 1) rolloverText = 'Вчера';
         else if (daysDiff === 2) rolloverText = '2 дня';
         else if (daysDiff === 3) rolloverText = '3 дня';
@@ -309,16 +325,14 @@ window.LifeState = {
     });
   },
 
-  // СКОЛЬЗЯЩИЙ ГОРИЗОНТ: БЛИЖАЙШИЕ 7 ДНЕЙ (Сегодня + 6 дней)
   getWeekTasks() {
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    
     const horizonDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6);
     const horizonStr = `${horizonDate.getFullYear()}-${String(horizonDate.getMonth() + 1).padStart(2, '0')}-${String(horizonDate.getDate()).padStart(2, '0')}`;
 
     const tasks = (this.data.tasks || []).filter(t => {
-      if (t.completed) return false; // Завершенные не загромождают горизонт
+      if (t.completed) return false;
 
       const hasDeadlineInHorizon = t.deadline && t.deadline >= todayStr && t.deadline <= horizonStr;
       const isOverdue = t.deadline && t.deadline < todayStr;
@@ -328,7 +342,6 @@ window.LifeState = {
       return hasDeadlineInHorizon || isOverdue || isManualWeek || isInFocus;
     });
 
-    // Сортировка: просроченные сверху, затем по дате дедлайна
     tasks.sort((a, b) => {
       if (a.deadline && b.deadline) return a.deadline.localeCompare(b.deadline);
       if (a.deadline && !b.deadline) return -1;
@@ -339,14 +352,11 @@ window.LifeState = {
     return tasks.map(t => {
       const project = (this.data.projects || []).find(p => p.id === t.projectId);
       const sphere = project ? (this.data.spheres || []).find(s => s.id === project.sphereId) : null;
-      
-      const isDueToday = t.deadline === todayStr;
-      const isOverdue = t.deadline && t.deadline < todayStr;
 
       return {
         ...t,
-        isDueToday: isDueToday,
-        isOverdue: isOverdue,
+        isDueToday: t.deadline === todayStr,
+        isOverdue: t.deadline && t.deadline < todayStr,
         projectName: project ? project.title : 'Общее',
         sphereTitle: sphere ? sphere.title : '',
         sphereColor: sphere ? sphere.color : '#FFD027'
@@ -359,6 +369,7 @@ window.LifeState = {
     (this.data.tasks || []).forEach(t => {
       if (t.inFocus && t.completed) {
         t.inFocus = false;
+        t.rev = (t.rev || 0) + 1;
         t.updatedAt = Date.now();
         changed = true;
       }
@@ -400,7 +411,7 @@ window.LifeState = {
     return task;
   },
 
-  // ===== БЕЗОПАСНАЯ СОРТИРОВКА С ДЕДУПЛИКАЦИЕЙ =====
+  // ===== БЕЗОПАСНАЯ СОРТИРОВКА И ПЕРЕТАСКИВАНИЕ =====
   _applyOrder(list, ids, belongs) {
     const own = list.filter(belongs);
     const map = new Map(own.map(x => [x.id, x]));
@@ -430,12 +441,17 @@ window.LifeState = {
     window.LifeStorage.save(this.data);
   },
 
+  // ИСПРАВЛЕННЫЙ БАГ: функция перетаскивания задач внутри проекта
+  reorderTasks(projectId, newOrderIds) {
+    this.data.tasks = this._applyOrder(this.data.tasks || [], newOrderIds, t => t.projectId === projectId);
+    window.LifeStorage.save(this.data);
+  },
+
   reorderGlobalTasks(newOrderIds) {
     const map = new Map((this.data.tasks || []).map(t => [t.id, t]));
     const seen = new Set();
     const ordered = [];
 
-    // 1. Ставим отсортированные пользователем задачи в новом порядке
     for (const id of newOrderIds) {
       if (map.has(id) && !seen.has(id)) {
         seen.add(id);
@@ -445,9 +461,7 @@ window.LifeState = {
       }
     }
 
-    // 2. Добавляем остальные задачи без изменений
     const rest = (this.data.tasks || []).filter(t => !seen.has(t.id));
-
     this.data.tasks = [...ordered, ...rest];
     window.LifeStorage.save(this.data);
   },
@@ -455,6 +469,7 @@ window.LifeState = {
   resetAll() {
     this.data = {
       schemaVersion: 1,
+      isOnboarding: false,
       spheres: [],
       projects: [],
       tasks: [],

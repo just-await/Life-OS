@@ -3,8 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Life OS — Тактильный личный планер</title>
+  <title>Life OS — Тактильный личный планер | Свободная голова</title>
   
+  <!-- SEO & Описание для поисковиков -->
+  <meta name="description" content="Персональный цифровой органайзер в стиле необрутализма. Полная разгрузка оперативной памяти человека, синхронизация через личный Яндекс Диск без подписок.">
+  <meta name="keywords" content="планер, органайзер, фокус дня, todo, необрутализм, тайм-менеджмент, local first, яндекс диск">
+  <meta name="author" content="Life OS">
+
+  <!-- OpenGraph для красивых превью в Telegram, VK, WhatsApp -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Life OS — Тактильный личный планер">
+  <meta property="og:description" content="Органайзер со свободной головой. Картотека дел, фокус дня и личное облако без корпораций и подписок.">
+  <meta property="og:image" content="assets/icons/icon.png">
+  <meta property="og:locale" content="ru_RU">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Life OS — Тактильный личный планер">
+  <meta name="twitter:description" content="Органайзер со свободной головой. Хранение на вашем личном Диске.">
+  <meta name="twitter:image" content="assets/icons/icon.png">
+
   <!-- Мета-теги PWA и Apple iOS -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#F6F3EB">
@@ -24,6 +42,23 @@
   <link rel="stylesheet" href="assets/css/neobrutalism.css">
   <link rel="stylesheet" href="assets/css/layout.css">
   <link rel="stylesheet" href="assets/css/modal.css">
+
+  <!-- Schema.org микроразметка для поисковиков -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Life OS",
+    "operatingSystem": "All",
+    "applicationCategory": "ProductivityApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "RUB"
+    },
+    "description": "Тактильный личный планер в стиле необрутализма с хранением данных на личном Диске."
+  }
+  </script>
 </head>
 <body>
 
@@ -43,12 +78,10 @@
           </div>
           <h1 class="logo-title">LIFE OS</h1>
         </div>
-        <!-- Переключатель темы на мобилке -->
         <button class="neo-btn theme-switch-btn theme-switch-btn-mobile" id="themeToggleBtnMobile" title="Сменить тему" aria-label="Сменить тему">🥛</button>
       </div>
 
       <div class="header-actions">
-        <!-- Переключатель темы на ПК -->
         <button class="neo-btn theme-switch-btn theme-switch-btn-desktop" id="themeToggleBtnDesktop" title="Сменить тему" aria-label="Сменить тему">🥛</button>
         <button class="neo-btn" id="installPwaBtn" style="display: none;" title="Установить как приложение">
           📲 Установить
@@ -64,6 +97,9 @@
 
     <!-- ЭКРАН 1: ДЭШБОРД (ФОКУС ДНЯ + КАРТОТЕКА СФЕР) -->
     <main id="viewDashboard" class="view-screen active">
+
+      <!-- Приветственный онбординг для новичков -->
+      <div id="onboardingWrapper" style="display: none;"></div>
       
       <!-- Фокус дня и Горизонт 7 дней -->
       <section class="neo-card focus-section">
@@ -76,6 +112,7 @@
               🗓️ 7 дней <span id="weekRatioLabel" class="focus-ratio-badge">0</span>
             </button>
           </div>
+          
           <button class="neo-btn neo-btn-sm clear-focus-btn" id="clearCompletedFocusBtn" style="display: none;" title="Убрать выполненные из фокуса">
             🧹 Очистить
           </button>
@@ -85,11 +122,15 @@
           <div class="progress-bar-fill" id="focusProgressFill" style="width: 0%;"></div>
         </div>
 
-        <!-- Список задач на Сегодня -->
         <div class="focus-list" id="focusList"></div>
-
-        <!-- Список задач на 7 дней (по умолчанию скрыт) -->
         <div class="focus-list" id="weekList" style="display: none;"></div>
+
+        <!-- Компактная кнопка чека: без лишнего шума -->
+        <div class="focus-ticket-bar" id="focusTicketBar">
+          <button type="button" class="focus-ticket-btn" id="shareDayTicketBtn">
+            🧾 Чек дня ↗
+          </button>
+        </div>
       </section>
 
       <!-- Картотека сфер -->
@@ -112,11 +153,14 @@
           ← Картотека
         </button>
         <div class="nav-actions-group">
+          <button class="neo-btn neo-btn-sm" id="shareSphereTemplateBtn" title="Поделиться шаблоном этой сферы">
+            📤 <span class="btn-label-responsive">Шаблон</span>
+          </button>
           <button class="neo-btn neo-btn-sm" id="editSphereBtn" title="Редактировать сферу">
-            ✏️ Изменить
+            ✏️ <span class="btn-label-responsive">Изменить</span>
           </button>
           <button class="neo-btn neo-btn-sm" id="deleteSphereBtn" style="color: #CF1322;" title="Удалить сферу">
-            🗑️ Удалить
+            🗑️ <span class="btn-label-responsive">Удалить</span>
           </button>
         </div>
       </div>
@@ -165,7 +209,6 @@
         </div>
       </div>
 
-      <!-- Баннер проекта -->
       <div class="sphere-banner neo-card" id="projectBanner">
         <div class="sphere-banner-badge" id="projectBannerIcon" aria-hidden="true"></div>
         <div class="sphere-banner-info" style="width: 100%;">
@@ -177,7 +220,6 @@
         </div>
       </div>
 
-      <!-- Задачи проекта -->
       <section class="neo-card" style="display: flex; flex-direction: column; gap: 14px;">
         <div class="section-title" style="margin-bottom: 0;">
           <span style="display: inline-flex; align-items: center; gap: 8px;">
@@ -189,7 +231,6 @@
           </span>
         </div>
 
-        <!-- Поле ввода теперь всегда сверху над задачами -->
         <form id="projectQuickTaskForm" class="quick-task-form">
           <input type="text" id="projectQuickTaskInput" class="quick-task-input" placeholder="+ Новая задача... (Enter для сохранения)" required autocomplete="off">
         </form>
@@ -212,7 +253,6 @@
         <button class="modal-close-btn" id="closeBackupModalBtn" aria-label="Закрыть">✕</button>
       </div>
 
-      <!-- Эстетичная кофейная карточка доната -->
       <div class="donation-card">
         <div class="donation-badge" aria-hidden="true">☕</div>
         <div class="donation-info">
@@ -227,7 +267,6 @@
         <span id="cloudStatusBadge" style="color: var(--accent-done);">● 100% Локально</span>
       </div>
 
-      <!-- Секция: Облачная синхронизация -->
       <div class="backup-section-box">
         <div class="backup-box-title">
           <span style="white-space: nowrap; flex-shrink: 0;">🟡 Яндекс Диск</span>
@@ -235,7 +274,6 @@
         </div>
         <p class="backup-box-desc">Приватная синхронизация через защищенную папку на вашем личном Диске.</p>
         
-        <!-- Не подключено -->
         <div id="yandexNotConnectedBlock" style="display: flex; flex-direction: column; gap: 8px;">
           <button type="button" class="neo-btn neo-btn-primary" id="loginYandexBtn" style="width: 100%;">
             ⚡ Войти через Яндекс ID
@@ -250,7 +288,6 @@
           </div>
         </div>
 
-        <!-- Подключено -->
         <div id="yandexConnectedBlock" style="display: none; flex-direction: column; gap: 8px;">
           <div style="display: flex; gap: 8px;">
             <button type="button" class="neo-btn neo-btn-primary neo-btn-sm" id="syncYandexNowBtn" style="flex: 1;">
@@ -266,7 +303,6 @@
         </div>
       </div>
 
-      <!-- Секция: Резервная копия (Файл) -->
       <div class="backup-section-box">
         <div class="backup-box-title">
           <span>📦 Файл резервной копии</span>
@@ -408,7 +444,7 @@
 
         <div class="form-group">
           <label class="form-label" for="detailTaskTitle">Задача</label>
-          <input type="text" id="detailTaskTitle" class="neo-input" required maxlength="120" autocomplete="off">
+          <textarea id="detailTaskTitle" class="neo-input" rows="1" required maxlength="200" autocomplete="off" style="min-height: 44px;"></textarea>
         </div>
 
         <div class="property-constructor-bar">
@@ -469,7 +505,7 @@
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО 7: Инструкция установки для iOS -->
+  <!-- МОДАЛЬНОЕ ОКНО 7: Установка на iOS -->
   <div class="modal-overlay" id="iosInstallModal" role="dialog" aria-modal="true" aria-labelledby="iosInstallTitle">
     <div class="modal-card">
       <div class="modal-header">
@@ -491,7 +527,7 @@
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО 8: Авторский диалог (Подтверждение и алерты) -->
+  <!-- МОДАЛЬНОЕ ОКНО 8: Авторский диалог -->
   <div class="modal-overlay" id="customDialogModal" role="dialog" aria-modal="true" aria-labelledby="customDialogTitle">
     <div class="modal-card custom-dialog-card">
       <div class="modal-header">
@@ -511,6 +547,50 @@
     </div>
   </div>
 
+  <!-- ВИРАЛЬНОЕ МОДАЛЬНОЕ ОКНО 9: Чек дня для Stories / Telegram -->
+  <div class="modal-overlay" id="shareDayModal" role="dialog" aria-modal="true" aria-labelledby="shareDayModalTitle">
+    <div class="modal-card" style="max-width: 460px; text-align: center;">
+      <div class="modal-header">
+        <h2 class="modal-title" id="shareDayModalTitle">🧾 Дневной чек продуктивности</h2>
+        <button class="modal-close-btn" id="closeShareDayBtn" aria-label="Закрыть">✕</button>
+      </div>
+      <p style="font-size: 0.82rem; color: var(--ink-muted); margin-top: -6px;">
+        Красивый отчет для публикации в Telegram, Stories или отправки друзьям:
+      </p>
+
+      <!-- Превью сгенерированной картинки (без двойных теней) -->
+      <div style="background: var(--bg-paper); border: var(--border-width) dashed var(--border-color); border-radius: 14px; padding: 12px; display: flex; justify-content: center;">
+        <img id="dayTicketImgPreview" alt="Чек продуктивности" style="max-width: 100%; height: auto; max-height: 52vh; border-radius: 8px; display: block;">
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 6px;">
+        <button type="button" class="neo-btn neo-btn-primary" id="shareNativeDayBtn" style="flex: 1;">
+          📤 Поделиться
+        </button>
+        <button type="button" class="neo-btn" id="downloadDayTicketBtn" style="flex: 1;">
+          💾 Скачать фото
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ВИРАЛЬНОЕ МОДАЛЬНОЕ ОКНО 10: Импорт чужого шаблона сферы -->
+  <div class="modal-overlay" id="importTemplateModal" role="dialog" aria-modal="true" aria-labelledby="importTemplateTitle">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <h2 class="modal-title" id="importTemplateTitle">📦 Новый шаблон сферы</h2>
+        <button class="modal-close-btn" id="closeImportTemplateBtn" aria-label="Закрыть">✕</button>
+      </div>
+      
+      <div id="importTemplateDetails" style="display: flex; flex-direction: column; gap: 10px; margin-top: 4px;"></div>
+
+      <div style="display: flex; gap: 8px; margin-top: 14px;">
+        <button type="button" class="neo-btn" id="cancelImportTemplateBtn" style="flex: 1;">Отмена</button>
+        <button type="button" class="neo-btn neo-btn-primary" id="confirmImportTemplateBtn" style="flex: 1;">+ Добавить в картотеку</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Скрипты приложения -->
   <script src="assets/js/config.js"></script>
   <script src="assets/js/icons.js"></script>
@@ -519,6 +599,7 @@
   <script src="assets/js/state.js"></script>
   <script src="assets/js/sync.js"></script>
   <script src="assets/js/backup.js"></script>
+  <script src="assets/js/viral.js"></script>
   <script src="assets/js/ui.js"></script>
   <script src="assets/js/app.js"></script>
 </body>

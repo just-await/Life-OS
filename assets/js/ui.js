@@ -149,8 +149,8 @@ palette: [
       donateBtn.href = window.LifeConfig.donationUrl;
     }
 
-    // Роутинг: перехват физической кнопки "Назад" на телефонах
-    history.replaceState({ view: 'dashboard' }, '');
+    // Роутинг: сохраняем хэш ссылки, чтобы не ломать шаблоны
+    history.replaceState({ view: 'dashboard' }, '', window.location.href);
     window.addEventListener('popstate', (e) => {
       const activeModals = document.querySelectorAll('.modal-overlay.active');
       if (activeModals.length > 0) {
@@ -171,6 +171,8 @@ palette: [
     this.bindEvents();
     this.renderModalPickers();
     this.updateCloudStatusUI();
+    this.renderOnboardingBanner();
+    this.setupModalScrollLock();
   },
 
   cacheDom() {
@@ -711,9 +713,6 @@ palette: [
       if (task.inWeek) {
         badgesHtml += `<span class="task-property-badge">🗓️ На неделе</span>`;
       }
-      if (task.note && task.note.trim()) {
-        badgesHtml += `<span class="task-property-badge">📝</span>`;
-      }
 
       let inlineChecklistBodyHtml = '';
       if (task.checklist && task.checklist.length > 0) {
@@ -753,6 +752,9 @@ palette: [
               ${task.inFocus ? '⭐' : '☆'}
             </button>
           </div>
+          ${task.note && task.note.trim() ? `
+            <div class="task-note-preview">📝 ${this.escapeHtml(task.note.length > 75 ? task.note.slice(0, 75) + '…' : task.note)}</div>
+          ` : ''}
           ${badgesHtml ? `
             <div class="task-footer-row" style="margin-top: 2px;">
               <div class="task-badges-left">${badgesHtml}</div>
@@ -777,7 +779,12 @@ palette: [
     checkboxes.forEach(box => {
       box.addEventListener('change', (e) => {
         const taskId = e.target.id.replace('pjchk-', '');
+        const taskCard = e.target.closest('.task-item');
         const updated = window.LifeState.toggleTaskCompleted(taskId);
+
+        if (taskCard && updated) {
+          taskCard.classList.toggle('task-completed', updated.completed);
+        }
 
         if (updated && updated.completed) {
           if (window.LifeConfig) window.LifeConfig.vibrate(40);
@@ -789,7 +796,14 @@ palette: [
           if (window.LifeConfig) window.LifeConfig.vibrate(20);
         }
 
-        this.renderProjectTasks();
+        // Обновляем счетчик проекта в шапке на лету
+        const projectId = window.LifeState.activeProjectId;
+        if (projectId) {
+          const pStats = window.LifeState.getProjectStats(projectId);
+          if (this.projectBannerMeta) this.projectBannerMeta.textContent = `${pStats.completed} из ${pStats.total} ${this.declensionTasks(pStats.total)} закрыто`;
+          if (this.projectBannerProgressBadge) this.projectBannerProgressBadge.textContent = `${pStats.percent}%`;
+        }
+
         this.renderFocusTasks();
         if (window.LifeSync) window.LifeSync.triggerAutoSync();
       });
@@ -857,6 +871,9 @@ palette: [
 
     this.detailTaskId.value = task.id;
     this.detailTaskTitle.value = task.title;
+    // Мгновенный авто-подгон высоты под длину текста
+    this.detailTaskTitle.style.height = 'auto';
+    this.detailTaskTitle.style.height = Math.max(44, this.detailTaskTitle.scrollHeight) + 'px';
     this.currentEditingChecklist = JSON.parse(JSON.stringify(task.checklist || []));
 
     // Свойство: На неделю
@@ -962,10 +979,6 @@ palette: [
           badgesHtml += `<span class="task-property-badge" style="background: var(--bg-card); color: var(--ink-muted); border-style: dashed;">⏳ ${task.rolloverText}</span>`;
         }
 
-        if (task.note && task.note.trim()) {
-          badgesHtml += `<span class="task-property-badge">📝</span>`;
-        }
-
         // Кнопка подзадач встраивается ВНУТРЬ строки бейджей
         let inlineChecklistBodyHtml = '';
         if (task.checklist && task.checklist.length > 0) {
@@ -1003,6 +1016,9 @@ palette: [
               <span class="task-text open-focus-task-modal" data-task-id="${safeTaskId}">${safeTitle}</span>
               <button class="task-star-btn unfocus-focus-btn" title="Убрать из фокуса дня" aria-label="Убрать из фокуса дня" data-unfocus-id="${safeTaskId}">⭐</button>
             </div>
+            ${task.note && task.note.trim() ? `
+              <div class="task-note-preview">📝 ${this.escapeHtml(task.note.length > 75 ? task.note.slice(0, 75) + '…' : task.note)}</div>
+            ` : ''}
             
             <div class="task-footer-row">
               <div class="task-badges-left">
@@ -1036,7 +1052,12 @@ palette: [
     checkboxes.forEach(box => {
       box.addEventListener('change', (e) => {
         const taskId = e.target.id.replace('chk-', '');
+        const taskCard = e.target.closest('.task-item');
         const updatedTask = window.LifeState.toggleTaskCompleted(taskId);
+
+        if (taskCard && updatedTask) {
+          taskCard.classList.toggle('task-completed', updatedTask.completed);
+        }
 
         if (updatedTask && updatedTask.completed) {
           if (window.LifeConfig) window.LifeConfig.vibrate(40);
@@ -1048,8 +1069,14 @@ palette: [
           if (window.LifeConfig) window.LifeConfig.vibrate(20);
         }
 
-        this.renderFocusTasks();
-        this.renderSpheres();
+        // Обновляем полоску прогресса на лету
+        const tasks = window.LifeState.getFocusTasks();
+        const completedCount = tasks.filter(t => t.completed).length;
+        const percent = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+        if (this.focusProgressFill) this.focusProgressFill.style.width = `${percent}%`;
+        if (this.focusRatioLabel) this.focusRatioLabel.textContent = `${completedCount}/${tasks.length}`;
+        if (this.clearCompletedFocusBtn) this.clearCompletedFocusBtn.style.display = completedCount > 0 ? 'inline-flex' : 'none';
+
         if (window.LifeSync) window.LifeSync.triggerAutoSync();
       });
     });
@@ -1140,10 +1167,6 @@ palette: [
         badgesHtml += `<span class="task-property-badge">📅 ${this.formatDate(task.deadline)}</span>`;
       }
 
-      if (task.note && task.note.trim()) {
-        badgesHtml += `<span class="task-property-badge">📝</span>`;
-      }
-
       let inlineChecklistBodyHtml = '';
       if (task.checklist && task.checklist.length > 0) {
         const done = task.checklist.filter(s => s.completed).length;
@@ -1182,6 +1205,9 @@ palette: [
               ${task.inFocus ? '⭐' : '☆'}
             </button>
           </div>
+          ${task.note && task.note.trim() ? `
+            <div class="task-note-preview">📝 ${this.escapeHtml(task.note.length > 75 ? task.note.slice(0, 75) + '…' : task.note)}</div>
+          ` : ''}
           
           <div class="task-footer-row">
             <div class="task-badges-left">
@@ -2317,6 +2343,21 @@ palette: [
         this.style.height = (this.scrollHeight) + 'px';
       });
     }
+
+    // Авто-расширение названия задачи + сохранение по Enter
+    if (this.detailTaskTitle) {
+      this.detailTaskTitle.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.max(44, this.scrollHeight) + 'px';
+      });
+
+      this.detailTaskTitle.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          this.taskDetailForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+      });
+    }
   },
 
   formatDate(dateStr) {
@@ -2357,5 +2398,80 @@ palette: [
     if (n % 10 === 1 && n % 100 !== 11) return 'задача';
     if ([2,3,4].includes(n % 10) && ![12,13,14].includes(n % 100)) return 'задачи';
     return 'задач';
+  },
+
+  // 10. ОНБОРДИНГ ДЛЯ НОВЫХ ПОЛЬЗОВАТЕЛЕЙ
+  renderOnboardingBanner() {
+    const wrap = document.getElementById('onboardingWrapper');
+    if (!wrap) return;
+
+    const data = window.LifeState.data;
+    if (!data || !data.isOnboarding) {
+      wrap.style.display = 'none';
+      return;
+    }
+
+    wrap.style.display = 'block';
+    wrap.innerHTML = `
+      <div class="onboarding-card">
+        <div class="onboarding-header">
+          <span class="onboarding-title">👋 Добро пожаловать в Life OS</span>
+          <button type="button" class="neo-btn neo-btn-sm" id="dismissOnboardTopBtn" style="padding: 2px 8px;">✕</button>
+        </div>
+        <p class="onboarding-text">
+          Мы наполнили планер стартовыми примерами. Попробуйте нажать на звёздочку ⭐, открыть проект или записать мысль в Инбокс!
+        </p>
+        <div class="onboarding-actions">
+          <button type="button" class="neo-btn neo-btn-sm neo-btn-primary" id="keepOnboardBtn">✓ Оставить примеры</button>
+          <button type="button" class="neo-btn neo-btn-sm" id="clearOnboardBtn" style="color: #CF1322;">🗑️ Начать с чистого листа</button>
+        </div>
+      </div>
+    `;
+
+    const closeOnboard = () => {
+      if (window.LifeState && window.LifeState.data) {
+        window.LifeState.data.isOnboarding = false;
+        window.LifeStorage.save(window.LifeState.data);
+      }
+      wrap.style.display = 'none';
+    };
+
+    const keepBtn = document.getElementById('keepOnboardBtn');
+    const dismissBtn = document.getElementById('dismissOnboardTopBtn');
+    const clearBtn = document.getElementById('clearOnboardBtn');
+
+    if (keepBtn) keepBtn.addEventListener('click', closeOnboard);
+    if (dismissBtn) dismissBtn.addEventListener('click', closeOnboard);
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', async () => {
+        const confirmed = await this.customConfirm('Очистить примеры и начать с абсолютно чистого блокнота?', 'Чистый старт');
+        if (confirmed) {
+          wrap.style.display = 'none'; // Мгновенно скрываем плашку
+          window.LifeState.resetAll();  // Очищаем базу с isOnboarding: false
+          this.showDashboard();
+          this.showToast('База готова к вашим личным целям!');
+          if (window.LifeSync) window.LifeSync.triggerAutoSync();
+        }
+      });
+    }
+  },
+
+  // 11. АВТОМАТИЧЕСКИЙ ЗАМОК СКРОЛЛА ФОНА (Scroll Lock)
+  setupModalScrollLock() {
+    const updateBodyLock = () => {
+      const isAnyModalActive = document.querySelector('.modal-overlay.active');
+      if (isAnyModalActive) {
+        document.body.classList.add('modal-open');
+      } else {
+        document.body.classList.remove('modal-open');
+      }
+    };
+
+    // Следим за открытием и закрытием абсолютно любых модальных окон
+    const observer = new MutationObserver(updateBodyLock);
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });
+    });
   }
 };

@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 1. Инициализация хранилища, состояния и интерфейса
   window.LifeState.init();
   window.LifeUI.init();
+  if (window.LifeViral) window.LifeViral.init();
 
   // 2. Регистрация Service Worker (PWA)
   registerServiceWorker();

@@ -1,3 +1,4 @@
+/* assets/css/layout.css */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -6,12 +7,12 @@
 }
 
 html, body {
-  scrollbar-width: none; /* Скрывает скроллбар в Firefox */
-  -ms-overflow-style: none; /* Скрывает в Edge */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 html::-webkit-scrollbar, body::-webkit-scrollbar {
-  display: none; /* Намертво скрывает скроллбар в Chrome, Opera, Safari */
+  display: none;
 }
 
 body {
@@ -167,9 +168,16 @@ body {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  animation: tabFadeIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+
 .focus-list::-webkit-scrollbar {
   display: none;
+}
+
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Карточка задачи */
@@ -187,7 +195,6 @@ body {
   -webkit-touch-callout: none;
 }
 
-/* Визуальный стиль перетаскивания */
 .task-item.dragging, .project-notebook-card.dragging {
   opacity: 0.4 !important;
   border-style: dashed !important;
@@ -210,6 +217,7 @@ body {
   align-items: flex-start;
   gap: 12px;
   width: 100%;
+  min-width: 0; /* Не дает неразрывным строкам выталкивать звездочку за экран */
 }
 
 .task-checkbox {
@@ -245,13 +253,14 @@ body {
 
 .task-text {
   flex: 1;
+  min-width: 0;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
   line-height: 1.35;
   color: var(--ink-black);
-  word-break: normal;
-  overflow-wrap: break-word;
+  word-break: normal; /* Обычные слова ВСЕГДА переносятся целиком */
+  overflow-wrap: anywhere; /* Ломает ТОЛЬКО не помещающиеся ссылки и сплошной текст */
 }
 
 .task-completed .task-text {
@@ -418,7 +427,7 @@ body {
   color: var(--ink-muted);
 }
 
-/* Сетка активных проектов */
+/* Сетка проектов */
 .projects-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
@@ -506,7 +515,7 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* Секция архива завершенных проектов */
+/* Архив проектов */
 .projects-archive-section {
   display: flex;
   flex-direction: column;
@@ -580,7 +589,7 @@ body {
   box-shadow: 2px 2px 0 var(--shadow-color);
 }
 
-/* МОБИЛЬНАЯ АДАПТАЦИЯ */
+/* Мобильная адаптация */
 @media (max-width: 600px) {
   body {
     padding: 16px 12px 32px;
@@ -628,24 +637,13 @@ body {
   }
 }
 
-/* ИДЕАЛЬНОЕ ВЫРАВНИВАНИЕ ШАПКИ ФОКУСА ДНЯ */
+/* Шапка фокуса дня */
 .focus-title-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   flex-wrap: nowrap;
-}
-
-.focus-title-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-}
-
-.focus-title-left > span:first-child {
-  white-space: nowrap;
 }
 
 .focus-ratio-badge {
@@ -667,7 +665,7 @@ body {
   flex-shrink: 0;
 }
 
-/* МИНИМАЛИСТИЧНЫЙ ИНДИКАТОР СИНХРОНИЗАЦИИ В ШАПКЕ */
+/* Индикатор синхронизации */
 .sync-dot {
   display: inline-block;
   width: 9px;
@@ -709,7 +707,6 @@ body {
   to { opacity: 1; transform: scale(1.18); }
 }
 
-/* БЕЙДЖ ДАТЫ И ВРЕМЕНИ СИНХРОНИЗАЦИИ */
 .sync-time-badge {
   font-family: var(--font-body);
   font-size: 0.75rem;
@@ -727,78 +724,7 @@ body {
   color: var(--ink-muted);
 }
 
-/* Выпадающие подзадачи на главном экране */
-.inline-checklist-wrap {
-  width: 100%;
-  margin-top: 4px;
-}
-.inline-checklist-toggle {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 1px 7px;
-  font-family: var(--font-body);
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--ink-black);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  line-height: 1.4;
-  user-select: none;
-  box-shadow: 1px 1px 0 var(--shadow-color);
-  transition: transform var(--transition-tactile), background-color var(--transition-tactile);
-}
-
-[data-theme="dark"] .inline-checklist-toggle {
-  background-color: var(--bg-beige);
-  color: #1D130E;
-}
-
-.inline-checklist-toggle:hover {
-  transform: translate(1px, 1px);
-  box-shadow: 0 0 0;
-}
-
-.inline-checklist-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 0 2px 10px;
-  border-left: 2px solid var(--border-color);
-  margin-top: 4px;
-  margin-left: 4px;
-}
-.inline-subtask-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--ink-black);
-}
-.inline-subtask-row.completed span {
-  text-decoration: line-through;
-  color: var(--ink-muted);
-}
-.inline-subtask-chk {
-  margin-top: 2px;
-  cursor: pointer;
-}
-
-.backup-box-title {
-  font-family: var(--font-heading);
-  font-size: 0.95rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* ТАКТИЛЬНЫЙ ПЕРЕКЛЮЧАТЕЛЬ: СЕГОДНЯ / 7 ДНЕЙ (БЕЗ СДВИГОВ ТЕКСТА) */
+/* Переключатель табов: Сегодня / 7 дней */
 .focus-tabs-group {
   display: inline-flex;
   align-items: center;
@@ -814,7 +740,7 @@ body {
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border: 1px solid transparent; /* Рамка есть всегда, поэтому текст никогда не прыгнет */
+  border: 1px solid transparent;
   background: transparent;
   color: var(--ink-muted);
   font-family: var(--font-heading);
@@ -831,7 +757,7 @@ body {
 .focus-tab-btn.active {
   background: var(--bg-card);
   color: var(--ink-black);
-  border-color: var(--border-color); /* Меняется только цвет границы */
+  border-color: var(--border-color);
   box-shadow: 1px 1px 0 var(--shadow-color);
 }
 
@@ -846,17 +772,7 @@ body {
   padding: 1px 5px;
 }
 
-/* ПЛАВНОЕ ПОЯВЛЕНИЕ СПИСКА ЗАДАЧ */
-.focus-list {
-  animation: tabFadeIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-@keyframes tabFadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* ВЫПАДАЮЩИЕ ПОДЗАДАЧИ (ШЕЛКОВЫЙ АККОРДЕОН НА CSS GRID) */
+/* Аккордеон подзадач (чистый CSS Grid без дубликатов) */
 .inline-checklist-wrap {
   width: 100%;
   margin-top: 4px;
@@ -917,4 +833,105 @@ body {
 .inline-subtask-chk {
   margin-top: 2px;
   cursor: pointer;
+}
+
+/* Предпросмотр заметок в карточках задач */
+.task-note-preview {
+  font-size: 0.76rem;
+  color: var(--ink-muted);
+  font-style: italic;
+  line-height: 1.35;
+  padding-left: 34px;
+  margin-top: -2px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+/* Приветственный онбординг для новичков */
+.onboarding-card {
+  background-color: var(--bg-card);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: 18px;
+  box-shadow: 4px 4px 0 var(--shadow-color);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: viewFadeIn 0.3s ease;
+}
+
+.onboarding-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.onboarding-title {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--ink-black);
+}
+
+.onboarding-text {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.onboarding-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+/* Аккуратная кнопка чека внизу фокуса дня */
+.focus-ticket-bar {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+  display: flex;
+  justify-content: flex-end; /* Стоит аккуратно справа, не перегружая экран */
+}
+
+.focus-ticket-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  background-color: var(--bg-card);
+  border: 1.5px solid var(--border-color);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-black);
+  cursor: pointer;
+  box-shadow: 1.5px 1.5px 0 var(--shadow-color);
+  transition: transform var(--transition-tactile), box-shadow var(--transition-tactile);
+}
+
+.focus-ticket-btn:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 0.5px 0.5px 0 var(--shadow-color);
+}
+
+/* Мобильная адаптация шапки сферы */
+@media (max-width: 540px) {
+  .btn-label-responsive {
+    display: none !important; /* На экранах смартфонов остаются только четкие иконки */
+  }
+  .nav-actions-group {
+    gap: 5px;
+  }
+  .nav-actions-group .neo-btn-sm {
+    padding: 6px 10px;
+  }
+  .sphere-nav-bar {
+    gap: 6px;
+  }
 }

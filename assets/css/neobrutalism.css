@@ -118,8 +118,8 @@
 }
 
 .folder-icon-badge {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   background-color: var(--tab-color, var(--folder-amber));
   border: var(--border-width) solid var(--border-color);
   border-radius: 10px;
@@ -127,6 +127,12 @@
   align-items: center;
   justify-content: center;
   color: #141414;
+  flex-shrink: 0;
+}
+
+.folder-icon-badge svg {
+  width: 23px;
+  height: 23px;
 }
 
 .folder-meta {

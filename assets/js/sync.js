@@ -272,11 +272,12 @@ window.LifeSync = {
     return msgEl.innerHTML;
   },
 
-  cleanOldTombstones(tombstones) {
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+ cleanOldTombstones(tombstones) {
+    // Храним метки удаления 90 дней (защита от воскрешения задач)
+    const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
     const cleaned = {};
     for (const [id, time] of Object.entries(tombstones || {})) {
-      if (time > thirtyDaysAgo) cleaned[id] = time;
+      if (time > ninetyDaysAgo) cleaned[id] = time;
     }
     return cleaned;
   },
@@ -435,6 +436,12 @@ window.LifeSync = {
 
       // 2. Умное слияние локальных и облачных данных
       const localData = window.LifeState.data || window.LifeStorage.load();
+      
+      // Создаем страховку: снимок локальной базы перед обновлением из облака
+      if (window.LifeStorage && window.LifeStorage.savePreSyncSnapshot) {
+        window.LifeStorage.savePreSyncSnapshot(localData);
+      }
+
       const mergedData = this.mergeData(localData, remoteData);
 
       // Сохраняем объединенные данные локально

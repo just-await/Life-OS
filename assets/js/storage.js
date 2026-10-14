@@ -125,6 +125,7 @@ window.LifeStorage = {
     }
     
     await this.initIndexedDB();
+    // СНАЧАЛА проверяем и восстанавливаем IndexedDB, если localStorage был очищен!
     await this.verifyAndRestoreFromIDB();
     this.isInitialized = true;
   },
@@ -156,32 +157,38 @@ window.LifeStorage = {
     });
   },
 
-  // АВАРИЙНЫЙ МОСТ: Если localStorage пуст (Safari стер кэш), поднимаем данные из IndexedDB
+  // АВАРИЙНЫЙ МОСТ: Гарантированное восстановление из IndexedDB
   async verifyAndRestoreFromIDB() {
-    const localRaw = localStorage.getItem(STORAGE_KEY);
+    let localRaw = null;
+    try {
+      localRaw = localStorage.getItem(STORAGE_KEY);
+    } catch (_) {}
+
+    // Если в localStorage УЖЕ есть реальные данные пользователя — не трогаем
     if (localRaw) {
-      window.LifeLog.info('LifeStorage', 'Оперативные данные найдены в кэше localStorage.');
-      return;
+      try {
+        const parsed = JSON.parse(localRaw);
+        if (parsed && Array.isArray(parsed.spheres) && parsed.spheres.length > 0 && !parsed.isOnboarding) {
+          window.LifeLog.info('LifeStorage', 'Оперативные данные найдены в кэше localStorage.');
+          return;
+        }
+      } catch (_) {}
     }
 
-    window.LifeLog.warn('LifeStorage', 'localStorage пуст! Пытаемся восстановить данные из постоянного сейфа IndexedDB...');
+    window.LifeLog.warn('LifeStorage', 'localStorage чист! Проверяем постоянный сейф IndexedDB...');
     if (!this.db) return;
 
     try {
       const dataFromIDB = await this.readFromIDB(STORAGE_KEY);
       if (dataFromIDB && typeof dataFromIDB === 'object' && Array.isArray(dataFromIDB.spheres) && dataFromIDB.spheres.length > 0) {
+        // ВОССТАНАВЛИВАЕМ ДАННЫЕ В LOCALSTORAGE!
         localStorage.setItem(STORAGE_KEY, JSON.stringify(dataFromIDB));
-        window.LifeLog.info('LifeStorage', '🎉 ДАННЫЕ УСПЕШНО ВОССТАНОВЛЕНЫ ИЗ INDEXEDDB!', { tasks: dataFromIDB.tasks?.length });
-        
-        if (window.LifeState) {
-          window.LifeState.data = dataFromIDB;
-        }
-        if (window.LifeUI && window.LifeUI.onSilentSyncCompleted) {
-          window.LifeUI.onSilentSyncCompleted();
-          window.LifeUI.showToast('Данные восстановлены из резервного сейфа устройства!');
-        }
+        window.LifeLog.info('LifeStorage', '🎉 УСПЕХ: База полностью восстановлена из сейфа IndexedDB!', {
+          spheres: dataFromIDB.spheres.length,
+          tasks: dataFromIDB.tasks?.length
+        });
       } else {
-        window.LifeLog.info('LifeStorage', 'IndexedDB также чист. Применяем начальные настройки для первого запуска.');
+        window.LifeLog.info('LifeStorage', 'В IndexedDB также пусто. Это первый чистый запуск.');
       }
     } catch (err) {
       window.LifeLog.error('LifeStorage', 'Сбой аварийного чтения из IndexedDB', err);

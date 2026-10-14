@@ -1,26 +1,27 @@
-// Life OS — Главная точка запуска
+// assets/js/app.js
+// Точка запуска Life OS: Асинхронный старт с гарантированным опросом IndexedDB
 let deferredPrompt = null;
 
-document.addEventListener('DOMContentLoaded', () => {
-  // 1. Инициализация хранилища, состояния и интерфейса
+document.addEventListener('DOMContentLoaded', async () => {
+  window.LifeLog.info('LifeApp', '🚀 Старт приложения. Ожидание проверки хранилищ...');
+
+  // 1. СТРОГО ДОЖИДАЕМСЯ инициализации IndexedDB и аварийного восстановления!
+  if (window.LifeStorage && window.LifeStorage.init) {
+    await window.LifeStorage.init();
+  }
+
+  // 2. Только когда хранилище на 100% готово — запускаем состояние и интерфейс
   window.LifeState.init();
   window.LifeUI.init();
   if (window.LifeViral) window.LifeViral.init();
 
-  // 2. Регистрация Service Worker (PWA)
+  // 3. Регистрация Service Worker (PWA)
   registerServiceWorker();
 
-  // 3. Подключение кнопки установки PWA
+  // 4. Подключение кнопки установки PWA
   initPwaInstall();
 
-  // Отлов скрытых ошибок (чтобы сайт не зависал молча)
-  window.addEventListener('error', () => {
-    if (window.LifeUI && window.LifeUI.showToast) {
-      window.LifeUI.showToast('Что-то пошло не так. Пожалуйста, перезагрузите страницу.', 'error');
-    }
-  });
-
-  // 4. ПРОВЕРКА ВОЗВРАТА ИЗ ЯНДЕКС ID (ВХОД В 1 КЛИК)
+  // 5. Проверка возврата из Яндекс ID (вход в 1 клик)
   if (window.LifeSync) {
     const isTokenCaptured = window.LifeSync.checkUrlToken();
     if (isTokenCaptured) {
@@ -30,21 +31,24 @@ document.addEventListener('DOMContentLoaded', () => {
         window.LifeSync.silentPull();
       }, 350);
     } else {
-      // Тихая синхронизация при обычном входе
       setTimeout(() => {
         window.LifeSync.silentPull();
       }, 800);
     }
   }
 
-  console.log('⚡ Life OS: Система готова к работе.');
+  window.LifeLog.info('LifeApp', '⚡ Life OS: Система полностью готова к работе.');
 });
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
     navigator.serviceWorker.register('./sw.js')
-      .then(() => console.log('⚡ Life OS: PWA кэш активен.'))
-      .catch((err) => console.warn('PWA:', err));
+      .then((reg) => {
+        window.LifeLog.info('LifeApp', 'PWA Service Worker зарегистрирован.');
+        // Проверяем обновления файла sw.js на сервере при каждом входе
+        reg.update().catch(() => {});
+      })
+      .catch((err) => window.LifeLog.warn('LifeApp', 'Ошибка регистрации PWA Service Worker', err));
   }
 }
 

@@ -1,5 +1,5 @@
-// sw.js — Service Worker Life OS v2.2 (Force Reset Cache)
-const CACHE_NAME = 'life-os-v2.2-force-reset-' + Date.now();
+// sw.js — Service Worker Life OS (Network-First: мгновенные обновления с GitHub)
+const CACHE_NAME = 'life-os-v2.3-network-first';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -57,38 +57,31 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// СТРАТЕГИЯ NETWORK-FIRST: Сначала проверяем сеть (GitHub), при сбое или офлайне — берем из кэша
 self.addEventListener('fetch', (event) => {
+  // Не трогаем сторонние API (Яндекс Диск / Google Drive)
   if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .then(async (response) => {
-          if (response && response.ok) {
-            const cache = await caches.open(CACHE_NAME);
-            cache.put('./index.html', response.clone());
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cache = await caches.open(CACHE_NAME);
-          return (await cache.match('./index.html')) || (await cache.match('index.html'));
-        })
-    );
-    return;
-  }
-
+  // Для навигации и локальных файлов: сначала идем в сеть за свежим кодом
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
+    fetch(event.request)
+      .then(async (networkResponse) => {
         if (networkResponse && networkResponse.ok) {
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse.clone()));
+          const cache = await caches.open(CACHE_NAME);
+          cache.put(event.request, networkResponse.clone());
         }
         return networkResponse;
-      }).catch(() => {});
-      return cachedResponse || fetchPromise;
-    })
+      })
+      .catch(async () => {
+        // Офлайн-режим (нет интернета): берем файл из кэша браузера
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) return cachedResponse;
+
+        if (event.request.mode === 'navigate') {
+          return (await caches.match('./index.html')) || (await caches.match('index.html'));
+        }
+      })
   );
 });

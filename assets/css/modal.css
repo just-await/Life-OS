@@ -620,3 +620,51 @@ textarea.neo-input {
 body.modal-open {
   overflow: hidden !important;
 }
+
+/* Тактильный переключатель облаков в стиле Необрутализма */
+.cloud-provider-tabs {
+  display: flex;
+  gap: 8px;
+  background-color: var(--bg-paper);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: 14px;
+  padding: 4px;
+  margin-bottom: 8px;
+}
+
+.cloud-tab-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--ink-muted);
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  transition: transform var(--transition-tactile), background var(--transition-tactile), color var(--transition-tactile), box-shadow var(--transition-tactile);
+}
+
+.cloud-tab-btn:hover {
+  color: var(--ink-black);
+}
+
+.cloud-tab-btn.active {
+  background-color: var(--bg-card);
+  color: var(--ink-black);
+  border: var(--border-width) solid var(--border-color);
+  box-shadow: 2px 2px 0 var(--shadow-color);
+  transform: translate(-1px, -1px);
+}
+
+[data-theme="dark"] .cloud-tab-btn.active {
+  background-color: var(--bg-subcard);
+  color: var(--ink-black);
+  border-color: var(--border-color);
+}

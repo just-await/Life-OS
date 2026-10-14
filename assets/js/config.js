@@ -14,7 +14,7 @@ window.LifeConfig = {
   // Настройки Google Диска (Google Identity Services)
   // Для боевого использования укажи свой Client ID из Google Cloud Console
   google: {
-    clientId: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
+    clientId: '261915453001-k5ppabdsrq906qc08bp2riqqjthb2ped.apps.googleusercontent.com',
   },
 
   // Настройки шлюза Cloudflare для Яндекс Диска

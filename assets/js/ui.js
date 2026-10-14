@@ -1265,6 +1265,65 @@ palette: [
     });
   },
 
+  switchFocusTab(targetTab) {
+    if (this.activeFocusTab === targetTab) return;
+    this.activeFocusTab = targetTab;
+
+    const isToday = targetTab === 'today';
+    const showEl = isToday ? this.focusList : this.weekList;
+    const hideEl = isToday ? this.weekList : this.focusList;
+
+    // Переключаем активные кнопки
+    if (this.tabFocusToday && this.tabFocusWeek) {
+      this.tabFocusToday.classList.toggle('active', isToday);
+      this.tabFocusToday.setAttribute('aria-selected', isToday ? 'true' : 'false');
+      this.tabFocusWeek.classList.toggle('active', !isToday);
+      this.tabFocusWeek.setAttribute('aria-selected', !isToday ? 'true' : 'false');
+    }
+
+    if (isToday) {
+      if (this.clearCompletedFocusBtn) {
+        const tasks = window.LifeState.getFocusTasks();
+        const hasDone = tasks.some(t => t.completed);
+        this.clearCompletedFocusBtn.style.display = hasDone ? 'inline-flex' : 'none';
+      }
+    } else {
+      if (this.clearCompletedFocusBtn) this.clearCompletedFocusBtn.style.display = 'none';
+      this.renderWeekTasks();
+    }
+
+    // ШЕЛКОВИСТЫЙ ПЕРЕХОД ПО ВЫСОТЕ (Папки не телепортируются, а плавно скользят)
+    const card = document.querySelector('.focus-section');
+    if (!card) {
+      hideEl.style.display = 'none';
+      showEl.style.display = 'flex';
+      return;
+    }
+
+    const prevHeight = card.offsetHeight;
+    hideEl.style.display = 'none';
+    showEl.style.display = 'flex';
+    const newHeight = card.offsetHeight;
+
+    if (prevHeight === newHeight) return;
+
+    card.style.height = `${prevHeight}px`;
+    card.style.overflow = 'hidden';
+
+    requestAnimationFrame(() => {
+      card.style.transition = 'height 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      card.style.height = `${newHeight}px`;
+    });
+
+    const onEnd = () => {
+      card.style.height = '';
+      card.style.transition = '';
+      card.style.overflow = '';
+      card.removeEventListener('transitionend', onEnd);
+    };
+    card.addEventListener('transitionend', onEnd);
+  },
+
   // 6. ИНБОКС
   renderInbox() {
     const items = window.LifeState.getInbox();
@@ -2008,32 +2067,10 @@ palette: [
       this.detailTaskDeadline.value = '';
     });
 
-    // Переключение табов: Сегодня / 7 дней
+    // Переключение табов: Сегодня / 7 дней с шелковой анимацией высоты
     if (this.tabFocusToday && this.tabFocusWeek) {
-      this.tabFocusToday.addEventListener('click', () => {
-        this.tabFocusToday.classList.add('active');
-        this.tabFocusToday.setAttribute('aria-selected', 'true');
-        this.tabFocusWeek.classList.remove('active');
-        this.tabFocusWeek.setAttribute('aria-selected', 'false');
-        this.focusList.style.display = 'flex';
-        this.weekList.style.display = 'none';
-        if (this.clearCompletedFocusBtn) {
-          const tasks = window.LifeState.getFocusTasks();
-          const hasDone = tasks.some(t => t.completed);
-          this.clearCompletedFocusBtn.style.display = hasDone ? 'inline-flex' : 'none';
-        }
-      });
-
-      this.tabFocusWeek.addEventListener('click', () => {
-        this.tabFocusWeek.classList.add('active');
-        this.tabFocusWeek.setAttribute('aria-selected', 'true');
-        this.tabFocusToday.classList.remove('active');
-        this.tabFocusToday.setAttribute('aria-selected', 'false');
-        this.focusList.style.display = 'none';
-        this.weekList.style.display = 'flex';
-        if (this.clearCompletedFocusBtn) this.clearCompletedFocusBtn.style.display = 'none';
-        this.renderWeekTasks();
-      });
+      this.tabFocusToday.addEventListener('click', () => this.switchFocusTab('today'));
+      this.tabFocusWeek.addEventListener('click', () => this.switchFocusTab('week'));
     }
 
     // Обработчик свойства "На неделю" в карточке задачи

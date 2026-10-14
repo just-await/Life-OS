@@ -5,6 +5,15 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html, body {
+  scrollbar-width: none; /* Скрывает скроллбар в Firefox */
+  -ms-overflow-style: none; /* Скрывает в Edge */
+}
+
+html::-webkit-scrollbar, body::-webkit-scrollbar {
+  display: none; /* Намертво скрывает скроллбар в Chrome, Opera, Safari */
+}
+
 body {
   background-color: var(--bg-paper);
   color: var(--ink-black);
@@ -773,7 +782,7 @@ body {
   gap: 8px;
 }
 
-/* ТАКТИЛЬНЫЙ ПЕРЕКЛЮЧАТЕЛЬ: СЕГОДНЯ / 7 ДНЕЙ */
+/* ТАКТИЛЬНЫЙ ПЕРЕКЛЮЧАТЕЛЬ: СЕГОДНЯ / 7 ДНЕЙ (БЕЗ СДВИГОВ ТЕКСТА) */
 .focus-tabs-group {
   display: inline-flex;
   align-items: center;
@@ -789,27 +798,31 @@ body {
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border: none;
+  border: 1px solid transparent; /* Рамка есть всегда, поэтому текст никогда не прыгнет */
   background: transparent;
   color: var(--ink-muted);
   font-family: var(--font-heading);
   font-size: 0.82rem;
   font-weight: 700;
+  line-height: 1;
   border-radius: 7px;
   cursor: pointer;
-  transition: background var(--transition-tactile), color var(--transition-tactile), transform var(--transition-tactile), box-shadow var(--transition-tactile);
+  user-select: none;
+  box-shadow: 0 0 0 transparent;
+  transition: background var(--transition-tactile), color var(--transition-tactile), border-color var(--transition-tactile), box-shadow var(--transition-tactile);
 }
 
 .focus-tab-btn.active {
   background: var(--bg-card);
   color: var(--ink-black);
+  border-color: var(--border-color); /* Меняется только цвет границы */
   box-shadow: 1px 1px 0 var(--shadow-color);
-  border: 1px solid var(--border-color);
 }
 
 [data-theme="dark"] .focus-tab-btn.active {
   background: var(--bg-beige);
   color: #1D130E;
+  border-color: var(--border-color);
 }
 
 .focus-tab-btn .focus-ratio-badge {
@@ -817,13 +830,13 @@ body {
   padding: 1px 5px;
 }
 
-/* БЕСШОВНОЕ ПОЯВЛЕНИЕ СПИСКА ПРИ СМЕНЕ ТАБОВ */
+/* ПЛАВНОЕ ПОЯВЛЕНИЕ СПИСКА ЗАДАЧ */
 .focus-list {
-  animation: tabFadeIn 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: tabFadeIn 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @keyframes tabFadeIn {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 

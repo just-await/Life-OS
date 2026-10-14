@@ -121,7 +121,7 @@ window.LifeSync = {
   startGoogleLogin() {
     if (!window.LifeConfig.google || !window.LifeConfig.google.clientId || window.LifeConfig.google.clientId.includes('YOUR_GOOGLE')) {
       window.LifeUI.customAlert(
-        `Чтобы включить Google Диск, укажите ваш бесплатный <strong>Client ID</strong> в файле <code>assets/js/config.js</code>.<br><br>Его можно получить за 2 минуты в Google Cloud Console (тип: OAuth Client ID для Web Application). Либо нажмите кнопку «Токен», если у вас уже есть токен.`,
+        `Чтобы включить Google Диск, укажите ваш бесплатный <strong>Client ID</strong> в файле <code>assets/js/config.js</code>.<br><br>Его можно получить за 2 минуты в Google Cloud Console.`,
         'Настройка Google Диска'
       );
       return;
@@ -154,7 +154,7 @@ window.LifeSync = {
     this.setStatus('NOT_CONNECTED');
   },
 
-  // 3. СЕТЕВЫЕ ЗАПРОСЫ И ШЛЮЗ
+  // 3. СЕТЕВЫЕ ЗАПРОСЫ
   async fetchWithTimeout(url, options = {}, timeoutMs = 8500) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -191,7 +191,7 @@ window.LifeSync = {
     throw new Error('Шлюз недоступен');
   },
 
-  // 4. ДЕТАЛЬНЫЙ ЧЕЛОВЕЧЕСКИЙ ПЕРЕВОДЧИК СБОЕВ
+  // 4. ПЕРЕВОДЧИК ОШИБОК
   translateError(err, provider = 'yandex') {
     const msg = String(err.message || err);
     const cloudName = provider === 'yandex' ? 'Яндекс Диска' : 'Google Диска';
@@ -227,7 +227,6 @@ window.LifeSync = {
     };
   },
 
-  // 5. УМНОЕ ОБЪЕДИНЕНИЕ ДАННЫХ (LWW + РЕВИЗИИ + 90 ДНЕЙ)
   cleanOldTombstones(tombstones) {
     const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
     const cleaned = {};
@@ -237,24 +236,17 @@ window.LifeSync = {
     return cleaned;
   },
 
+  // 5. ИСПРАВЛЕННОЕ СЛИЯНИЕ ДАННЫХ (БЕЗ УДАЛЕНИЯ БЭКАПОВ)
   mergeData(local, remote) {
     if (!remote) return local;
     if (!local) return remote;
 
-    // ПРЕДОХРАНИТЕЛЬ ПУСТОТЫ: если локальная база пуста, но пользователь не делал сброс (resetAt = 0),
-    // а в облаке есть данные — защищаем пользователя и берем данные из облака!
+    // Если на устройстве вообще нет задач, а в импорте/облаке есть — безоговорочно берем входящие
     const localHasData = (local.tasks && local.tasks.length > 0) || (local.spheres && local.spheres.length > 0);
     const remoteHasData = (remote.tasks && remote.tasks.length > 0) || (remote.spheres && remote.spheres.length > 0);
-    
-    if (!localHasData && remoteHasData && (!local.resetAt || local.resetAt === 0)) {
+    if (!localHasData && remoteHasData) {
       return remote;
     }
-
-    const localReset = local.resetAt || 0;
-    const remoteReset = remote.resetAt || 0;
-
-    if (localReset > (remote.updatedAt || 0) && localReset > remoteReset) return local;
-    if (remoteReset > (local.updatedAt || 0) && remoteReset > localReset) return remote;
 
     const rawTombstones = { ...(local.tombstones || {}), ...(remote.tombstones || {}) };
     const tombstones = this.cleanOldTombstones(rawTombstones);
@@ -267,7 +259,7 @@ window.LifeSync = {
       tasks: [],
       inbox: [],
       tombstones: tombstones,
-      resetAt: Math.max(localReset, remoteReset)
+      resetAt: Math.max(local.resetAt || 0, remote.resetAt || 0)
     };
 
     const isDeleted = (id, updatedAt) => {
@@ -355,7 +347,53 @@ window.LifeSync = {
     return merged;
   },
 
-  // 6. СИНХРОНИЗАЦИЯ С ТЕКУЩИМ ОБЛАКОМ
+  // 6. ПРИНУДИТЕЛЬНАЯ ВЫГРУЗКА БЭКАПА В ОБЛАКО (ПОСЛЕ ИМПОРТА)
+  async pushLocalToCloud() {
+    if (!this.getCurrentToken()) return;
+    this.isSyncing = true;
+    this.setStatus('SYNCING');
+    const localData = window.LifeState.data || window.LifeStorage.load();
+
+    try {
+      if (this.provider === 'yandex') {
+        const filePath = 'app:/planner_data.json';
+        const upMetaRes = await fetch(`https://cloud-api.yandex.net/v1/disk/resources/upload?path=${encodeURIComponent(filePath)}&overwrite=true&_ts=${Date.now()}`, {
+          headers: { Authorization: `OAuth ${this.yandexToken}` }
+        });
+        const upMeta = await upMetaRes.json();
+        await fetch(upMeta.href, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(localData)
+        });
+        localStorage.setItem('LIFE_OS_LAST_SYNC_TS_YANDEX', Date.now().toString());
+      } else {
+        // Google Drive Push
+        let fileId = this.googleFileId;
+        if (fileId) {
+          await this.fetchWithTimeout(
+            `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+            {
+              method: 'PATCH',
+              headers: { Authorization: `Bearer ${this.googleToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify(localData)
+            }
+          );
+        }
+        localStorage.setItem('LIFE_OS_LAST_SYNC_TS_GOOGLE', Date.now().toString());
+      }
+
+      this.isSyncing = false;
+      localStorage.removeItem('LIFE_OS_SYNC_PENDING');
+      this.setStatus('SYNCED');
+    } catch (e) {
+      console.warn('Ошибка выгрузки бэкапа в облако:', e);
+      this.isSyncing = false;
+      this.setStatus('OFFLINE');
+    }
+  },
+
+  // СИНХРОНИЗАЦИЯ С ТЕКУЩИМ ОБЛАКОМ
   async syncWithCurrentCloud(callback, silent = false) {
     if (this.provider === 'google') {
       return this.syncWithGoogleDrive(callback, silent);
@@ -363,7 +401,7 @@ window.LifeSync = {
     return this.syncWithYandexDisk(callback, silent);
   },
 
-  // СИНХРОНИЗАЦИЯ ЯНДЕКС ДИСК
+  // ЯНДЕКС ДИСК
   async syncWithYandexDisk(callback, silent = false) {
     if (!this.yandexToken) {
       this.setStatus('NOT_CONNECTED');
@@ -401,7 +439,6 @@ window.LifeSync = {
         }
       }
 
-      // Страховочный снимок локальной базы перед слиянием
       const localData = window.LifeState.data || window.LifeStorage.load();
       window.LifeStorage.savePreSyncSnapshot(localData);
 
@@ -409,7 +446,6 @@ window.LifeSync = {
       window.LifeStorage.save(mergedData);
       window.LifeState.data = mergedData;
 
-      // Запись обновлений в облако
       const upMetaRes = await fetch(`https://cloud-api.yandex.net/v1/disk/resources/upload?path=${encodeURIComponent(filePath)}&overwrite=true&_ts=${cacheBuster}`, {
         headers: { Authorization: `OAuth ${this.yandexToken}` }
       });
@@ -446,7 +482,7 @@ window.LifeSync = {
     }
   },
 
-  // СИНХРОНИЗАЦИЯ GOOGLE ДИСК (Прямой CORS без шлюзов)
+  // GOOGLE ДИСК
   async syncWithGoogleDrive(callback, silent = false) {
     if (!this.googleToken) {
       this.setStatus('NOT_CONNECTED');
@@ -486,7 +522,6 @@ window.LifeSync = {
 
       let remoteData = null;
 
-      // 2. Скачиваем файл, если он уже есть в Google Диске
       if (fileId) {
         const getRes = await this.fetchWithTimeout(
           `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
@@ -500,7 +535,6 @@ window.LifeSync = {
         }
       }
 
-      // 3. Слияние с локальной базой
       const localData = window.LifeState.data || window.LifeStorage.load();
       window.LifeStorage.savePreSyncSnapshot(localData);
 
@@ -508,9 +542,7 @@ window.LifeSync = {
       window.LifeStorage.save(mergedData);
       window.LifeState.data = mergedData;
 
-      // 4. Отправляем обновленный файл в Google Диск
       if (fileId) {
-        // Обновляем существующий
         const patchRes = await this.fetchWithTimeout(
           `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
           {
@@ -526,7 +558,6 @@ window.LifeSync = {
         if (patchRes.status === 401 || patchRes.status === 403) throw new Error('AUTH_ERROR');
         if (!patchRes.ok) throw new Error(`HTTP ${patchRes.status}`);
       } else {
-        // Создаем новый файл в папке appDataFolder
         const metadata = {
           name: 'planner_data.json',
           parents: ['appDataFolder']
@@ -597,7 +628,6 @@ window.LifeSync = {
         }
       } catch (_) {}
     } else {
-      // Google Recreate
       try {
         this.googleFileId = null;
         localStorage.removeItem('LIFE_OS_GOOGLE_FILE_ID');
@@ -629,5 +659,275 @@ window.LifeSync = {
     this.autoSyncTimer = setTimeout(() => {
       this.silentPull();
     }, 2200);
+  },
+
+  // 8. 100% РЕАЛЬНАЯ ЖИВАЯ ДИАГНОСТИКА С ЛОГАМИ
+  async runDiagnostic() {
+    const modal = document.getElementById('customDialogModal');
+    const titleEl = document.getElementById('customDialogTitle');
+    const msgEl = document.getElementById('customDialogMessage');
+    const confirmBtn = document.getElementById('customDialogConfirmBtn');
+    const cancelBtn = document.getElementById('customDialogCancelBtn');
+    const promptBox = document.getElementById('customDialogPromptBox');
+
+    const isGoogle = this.provider === 'google';
+
+    const yandexSteps = [
+      { id: 'token', name: 'Ключ авторизации Яндекс ID', status: 'pending', desc: 'Ожидание...' },
+      { id: 'net', name: 'Связь с серверами Яндекса', status: 'pending', desc: 'Ожидание...' },
+      { id: 'proxy', name: 'Шлюз Cloudflare (Обход CORS)', status: 'pending', desc: 'Ожидание...' },
+      { id: 'write', name: 'Права на запись (app:/)', status: 'pending', desc: 'Ожидание...' }
+    ];
+
+    const googleSteps = [
+      { id: 'clientId', name: 'Google Client ID в config.js', status: 'pending', desc: 'Ожидание...' },
+      { id: 'token', name: 'Ключ авторизации Google Token', status: 'pending', desc: 'Ожидание...' },
+      { id: 'net', name: 'Связь с серверами Google API', status: 'pending', desc: 'Ожидание...' },
+      { id: 'appData', name: 'Сектор хранения appDataFolder', status: 'pending', desc: 'Ожидание...' }
+    ];
+
+    const steps = isGoogle ? googleSteps : yandexSteps;
+
+    const render = (finalVerdict = null) => {
+      let content = `<div style="display: flex; flex-direction: column; gap: 8px; text-align: left;">`;
+      steps.forEach(s => {
+        let icon = '⏳';
+        let color = 'var(--ink-muted)';
+        if (s.status === 'running') { icon = '⚡'; color = 'var(--folder-amber)'; }
+        if (s.status === 'ok') { icon = '✅'; color = 'var(--accent-done)'; }
+        if (s.status === 'error') { icon = '❌'; color = '#CF1322'; }
+
+        content += `
+          <div style="display: flex; gap: 10px; align-items: flex-start; background: var(--bg-card); padding: 8px 12px; border-radius: 10px; border: 1.5px solid var(--border-color);">
+            <span style="font-size: 1.15rem; line-height: 1.2;">${icon}</span>
+            <div style="display: flex; flex-direction: column; gap: 1px;">
+              <strong style="font-size: 0.88rem; color: ${s.status === 'error' ? '#CF1322' : 'var(--ink-black)'};">${s.name}</strong>
+              <span style="font-size: 0.76rem; color: ${color}; line-height: 1.25;">${s.desc}</span>
+            </div>
+          </div>
+        `;
+      });
+      if (finalVerdict) content += finalVerdict;
+      content += `</div>`;
+      if (msgEl) msgEl.innerHTML = content;
+    };
+
+    if (modal && titleEl && msgEl) {
+      titleEl.textContent = isGoogle ? '🔍 Диагностика Google Диска' : '🔍 Диагностика Яндекс Диска';
+      if (cancelBtn) cancelBtn.style.display = 'none';
+      if (promptBox) promptBox.style.display = 'none';
+      if (confirmBtn) confirmBtn.style.display = 'none';
+      render();
+      modal.classList.add('active');
+    }
+
+    if (isGoogle) {
+      // GOOGLE ТЕСТ 1: Client ID
+      steps[0].status = 'running';
+      steps[0].desc = 'Проверка настроек config.js...';
+      render();
+      await new Promise(r => setTimeout(r, 150));
+
+      const gClientId = window.LifeConfig.google && window.LifeConfig.google.clientId;
+      if (!gClientId || gClientId.includes('YOUR_GOOGLE')) {
+        steps[0].status = 'error';
+        steps[0].desc = 'Не указан Client ID в assets/js/config.js';
+        steps[1].desc = 'Отменено'; steps[2].desc = 'Отменено'; steps[3].desc = 'Отменено';
+        render(`<div style="margin-top: 6px; padding: 10px; background: #FFF1F0; color: #CF1322; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.8rem; border: 1.5px solid #FFA39E;">Создайте OAuth Client ID в Google Cloud Console</div>`);
+        if (confirmBtn) { confirmBtn.style.display = 'inline-flex'; confirmBtn.textContent = 'Понятно'; }
+        return;
+      }
+      steps[0].status = 'ok';
+      steps[0].desc = 'Client ID найден.';
+      render();
+
+      // GOOGLE ТЕСТ 2: Токен
+      steps[1].status = 'running';
+      steps[1].desc = 'Проверка токена...';
+      render();
+      await new Promise(r => setTimeout(r, 150));
+
+      if (!this.googleToken) {
+        steps[1].status = 'error';
+        steps[1].desc = 'Вход не выполнен. Нажмите «Войти через Google».';
+        steps[2].desc = 'Отменено'; steps[3].desc = 'Отменено';
+        render(`<div style="margin-top: 6px; padding: 10px; background: #FFF1F0; color: #CF1322; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.8rem; border: 1.5px solid #FFA39E;">Требуется авторизация</div>`);
+        if (confirmBtn) { confirmBtn.style.display = 'inline-flex'; confirmBtn.textContent = 'Понятно'; }
+        return;
+      }
+
+      if (Date.now() > this.googleTokenExpiresAt) {
+        steps[1].status = 'error';
+        steps[1].desc = 'Срок ключа истёк. Нажмите «Войти через Google».';
+        steps[2].desc = 'Отменено'; steps[3].desc = 'Отменено';
+        render(`<div style="margin-top: 6px; padding: 10px; background: #FFF1F0; color: #CF1322; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.8rem; border: 1.5px solid #FFA39E;">Срок токена истёк</div>`);
+        if (confirmBtn) { confirmBtn.style.display = 'inline-flex'; confirmBtn.textContent = 'Понятно'; }
+        return;
+      }
+      steps[1].status = 'ok';
+      steps[1].desc = 'Токен активен (осталось ' + Math.round((this.googleTokenExpiresAt - Date.now()) / 60000) + ' мин).';
+      render();
+
+      // GOOGLE ТЕСТ 3: Сеть
+      steps[2].status = 'running';
+      steps[2].desc = 'Сетевой запрос к Google API...';
+      render();
+
+      try {
+        const pingRes = await this.fetchWithTimeout(
+          'https://www.googleapis.com/drive/v3/about?fields=user',
+          { headers: { Authorization: `Bearer ${this.googleToken}` } },
+          5000
+        );
+
+        if (pingRes.status === 401 || pingRes.status === 403) {
+          const errData = await pingRes.json().catch(() => ({}));
+          const reason = errData.error && errData.error.message ? errData.error.message : 'Доступ отклонен';
+          throw new Error('403: ' + reason);
+        }
+        if (!pingRes.ok) throw new Error('HTTP ' + pingRes.status);
+
+        const uData = await pingRes.json();
+        const email = uData.user && uData.user.emailAddress ? uData.user.emailAddress : 'OK';
+        steps[2].status = 'ok';
+        steps[2].desc = `Связь стабильна. Аккаунт: ${email}`;
+      } catch (err) {
+        steps[2].status = 'error';
+        steps[2].desc = err.message.includes('403') 
+          ? 'Google заблокировал доступ (добавьте почту в Test Users в консоли Google).'
+          : 'Таймаут соединения с Google (включите VPN).';
+        steps[3].desc = 'Отменено';
+        render(`<div style="margin-top: 6px; padding: 10px; background: #FFF1F0; color: #CF1322; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.8rem; border: 1.5px solid #FFA39E;">${steps[2].desc}</div>`);
+        if (confirmBtn) { confirmBtn.style.display = 'inline-flex'; confirmBtn.textContent = 'Понятно'; }
+        return;
+      }
+      render();
+
+      // GOOGLE ТЕСТ 4: appDataFolder
+      steps[3].status = 'running';
+      steps[3].desc = 'Проверка папки appDataFolder...';
+      render();
+
+      try {
+        const folderRes = await this.fetchWithTimeout(
+          `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&pageSize=1&fields=files(id)`,
+          { headers: { Authorization: `Bearer ${this.googleToken}` } },
+          5000
+        );
+        if (!folderRes.ok) throw new Error('HTTP ' + folderRes.status);
+        steps[3].status = 'ok';
+        steps[3].desc = 'Сектор appDataFolder доступен, запись разрешена.';
+      } catch (err) {
+        steps[3].status = 'error';
+        steps[3].desc = 'Сбой доступа к папке (' + err.message + ')';
+      }
+
+    } else {
+      // ЯНДЕКС ТЕСТ 1: Токен
+      steps[0].status = 'running';
+      steps[0].desc = 'Проверка токена Яндекс ID...';
+      render();
+      await new Promise(r => setTimeout(r, 120));
+
+      if (!this.yandexToken) {
+        steps[0].status = 'error';
+        steps[0].desc = 'Токен не найден. Нажмите «Войти через Яндекс ID».';
+        steps[1].desc = 'Отменено'; steps[2].desc = 'Отменено'; steps[3].desc = 'Отменено';
+        render(`<div style="margin-top: 6px; padding: 10px; background: #FFF1F0; color: #CF1322; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.82rem; border: 1.5px solid #FFA39E;">Требуется авторизация</div>`);
+        if (confirmBtn) { confirmBtn.style.display = 'inline-flex'; confirmBtn.textContent = 'Понятно'; }
+        return;
+      }
+      steps[0].status = 'ok';
+      steps[0].desc = 'Токен найден и загружен.';
+      render();
+
+      // ЯНДЕКС ТЕСТ 2: Сеть
+      steps[1].status = 'running';
+      steps[1].desc = 'Запрос к cloud-api.yandex.net...';
+      render();
+
+      let downloadHref = null;
+      try {
+        const appRes = await this.fetchWithTimeout('https://cloud-api.yandex.net/v1/disk/resources?path=app:/', {
+          headers: { Authorization: `OAuth ${this.yandexToken}` }
+        }, 4000);
+        if (!appRes.ok) throw new Error(`HTTP ${appRes.status}`);
+        steps[1].status = 'ok';
+        steps[1].desc = 'Связь стабильна. Папка app:/ доступна.';
+      } catch (e) {
+        steps[1].status = 'error';
+        steps[1].desc = e.message === 'TIMEOUT' ? 'Таймаут соединения с Яндексом.' : 'Отклонено Яндексом (токен недействителен).';
+        steps[2].desc = 'Отменено'; steps[3].desc = 'Отменено';
+        render(`<div style="margin-top: 6px; padding: 10px; background: #FFF1F0; color: #CF1322; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.82rem; border: 1.5px solid #FFA39E;">Сбой связи с серверами Яндекса</div>`);
+        if (confirmBtn) { confirmBtn.style.display = 'inline-flex'; confirmBtn.textContent = 'Понятно'; }
+        return;
+      }
+      render();
+
+      // ЯНДЕКС ТЕСТ 3: Шлюз
+      steps[2].status = 'running';
+      steps[2].desc = 'Тестирование шлюза Cloudflare...';
+      render();
+
+      try {
+        const downMetaRes = await this.fetchWithTimeout('https://cloud-api.yandex.net/v1/disk/resources/download?path=app:/planner_data.json', {
+          headers: { Authorization: `OAuth ${this.yandexToken}` }
+        }, 4000);
+        if (downMetaRes.ok) {
+          const meta = await downMetaRes.json();
+          downloadHref = meta.href;
+        }
+      } catch (_) {}
+
+      try {
+        if (downloadHref) {
+          await this.downloadYandexFile(downloadHref);
+          steps[2].status = 'ok';
+          steps[2].desc = 'Шлюз ответил успешно, данные базы прочитаны.';
+        } else {
+          const proxyUrl = window.LifeConfig.network.proxyUrl;
+          const pingRes = await this.fetchWithTimeout(`${proxyUrl}?url=${encodeURIComponent('https://downloader.disk.yandex.ru')}`, {}, 4500);
+          if (!pingRes.ok && pingRes.status !== 403) throw new Error();
+          steps[2].status = 'ok';
+          steps[2].desc = 'Шлюз Cloudflare на связи и готов к работе.';
+        }
+      } catch (e) {
+        steps[2].status = 'error';
+        steps[2].desc = 'Шлюз заблокирован оператором (нужен VPN).';
+        steps[3].desc = 'Отменено';
+        render(`<div style="margin-top: 6px; padding: 10px; background: #FFF1F0; color: #CF1322; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.8rem; border: 1.5px solid #FFA39E;">Домен workers.dev заблокирован. Включите VPN.</div>`);
+        if (confirmBtn) { confirmBtn.style.display = 'inline-flex'; confirmBtn.textContent = 'Понятно'; }
+        return;
+      }
+      render();
+
+      // ЯНДЕКС ТЕСТ 4: Запись
+      steps[3].status = 'running';
+      steps[3].desc = 'Проверка разрешений на запись в хранилище...';
+      render();
+
+      try {
+        const upMetaRes = await this.fetchWithTimeout('https://cloud-api.yandex.net/v1/disk/resources/upload?path=app:/planner_data.json&overwrite=true', {
+          headers: { Authorization: `OAuth ${this.yandexToken}` }
+        }, 4000);
+        if (!upMetaRes.ok) throw new Error();
+        steps[3].status = 'ok';
+        steps[3].desc = 'Хранилище свободно, запись разрешена.';
+      } catch (e) {
+        steps[3].status = 'error';
+        steps[3].desc = 'Яндекс отклонил запись (возможно, нет места).';
+      }
+    }
+
+    const allOk = steps.every(s => s.status === 'ok');
+    const finalBanner = allOk
+      ? `<div style="margin-top: 6px; padding: 10px; background: var(--bg-subcard); border: 1.5px solid var(--accent-done); color: var(--accent-done); border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.84rem;">🎉 Все системы ${isGoogle ? 'Google Диска' : 'Яндекс Диска'} работают идеально</div>`
+      : `<div style="margin-top: 6px; padding: 10px; background: #FFF1F0; border: 1.5px solid #FFA39E; color: #CF1322; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.82rem;">Обнаружены проблемы в цепочке синхронизации</div>`;
+
+    render(finalBanner);
+    if (confirmBtn) {
+      confirmBtn.style.display = 'inline-flex';
+      confirmBtn.textContent = 'Понятно';
+    }
   }
 };

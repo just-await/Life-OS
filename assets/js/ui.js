@@ -2116,16 +2116,15 @@ palette: [
       this.recreateGoogleFileBtn.addEventListener('click', () => window.LifeSync.recreateCloudFile());
     }
 
-    // Диагностика Яндекс
-    const runDiagHandler = async () => {
-      this.showToast('Запуск диагностики...');
-      const report = await window.LifeSync.runDiagnostic();
-      this.customAlert(report, 'Диагностика связи');
+    // Диагностика Яндекс и Google
+    const runRealTimeDiag = async () => {
+      await window.LifeSync.runDiagnostic();
     };
-    if (this.diagYandexBtn) this.diagYandexBtn.addEventListener('click', runDiagHandler);
-    if (this.diagYandexConnectedBtn) this.diagYandexConnectedBtn.addEventListener('click', runDiagHandler);
-    if (this.diagGoogleBtn) this.diagGoogleBtn.addEventListener('click', () => this.showToast('Google Drive работает напрямую через CORS'));
-    if (this.diagGoogleConnectedBtn) this.diagGoogleConnectedBtn.addEventListener('click', () => this.showToast('Google Drive подключен'));
+
+    if (this.diagYandexBtn) this.diagYandexBtn.addEventListener('click', runRealTimeDiag);
+    if (this.diagYandexConnectedBtn) this.diagYandexConnectedBtn.addEventListener('click', runRealTimeDiag);
+    if (this.diagGoogleBtn) this.diagGoogleBtn.addEventListener('click', runRealTimeDiag);
+    if (this.diagGoogleConnectedBtn) this.diagGoogleConnectedBtn.addEventListener('click', runRealTimeDiag);
 
     this.downloadBackupBtn.addEventListener('click', async () => {
       const fileName = await window.LifeBackup.exportData();
@@ -2164,7 +2163,10 @@ palette: [
             this.backupModal.classList.remove('active');
             this.showDashboard();
             this.renderInbox();
-            if (window.LifeSync) window.LifeSync.triggerAutoSync();
+            // КРИТИЧЕСКИЙ ФИКС: сразу выгружаем импортированный бэкап в облако!
+            if (window.LifeSync && window.LifeSync.pushLocalToCloud) {
+              window.LifeSync.pushLocalToCloud();
+            }
           } else {
             this.customAlert(`Ошибка: ${res.error}`, 'Сбой восстановления');
           }

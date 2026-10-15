@@ -21,16 +21,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 4. Подключение кнопки установки PWA
   initPwaInstall();
 
-  // 5. Проверка возврата из Яндекс ID (вход в 1 клик)
+  // 5. Проверка возврата из Яндекс ID или Google OAuth
   if (window.LifeSync) {
-    const isTokenCaptured = window.LifeSync.checkUrlToken();
-    if (isTokenCaptured) {
+    const isYandexCaptured = window.LifeSync.checkUrlToken();
+    const isGoogleCaptured = await window.LifeSync.checkUrlCode();
+
+    if (isYandexCaptured) {
       setTimeout(() => {
         window.LifeUI.showToast('🎉 Яндекс Диск успешно подключен!');
         window.LifeUI.updateCloudStatusUI();
         window.LifeSync.silentPull();
       }, 350);
-    } else {
+    } else if (!isGoogleCaptured) {
       setTimeout(() => {
         window.LifeSync.silentPull();
       }, 800);

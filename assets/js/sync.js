@@ -17,6 +17,7 @@ window.LifeSync = {
     this.provider = localStorage.getItem('LIFE_OS_CLOUD_PROVIDER') || 'yandex';
     this.yandexToken = localStorage.getItem('LIFE_OS_YANDEX_TOKEN') || null;
     this.googleToken = localStorage.getItem('LIFE_OS_GOOGLE_TOKEN') || null;
+    this.googleRefreshToken = localStorage.getItem('LIFE_OS_GOOGLE_REFRESH') || null;
     this.googleTokenExpiresAt = Number(localStorage.getItem('LIFE_OS_GOOGLE_EXPIRES')) || 0;
     this.googleFileId = localStorage.getItem('LIFE_OS_GOOGLE_FILE_ID') || null;
 
@@ -109,84 +110,133 @@ window.LifeSync = {
     this.setStatus('NOT_CONNECTED');
   },
 
-  // 2. АВТОРИЗАЦИЯ GOOGLE
-  initGoogleClient() {
-    if (typeof window.google !== 'undefined' && window.google.accounts && window.LifeConfig.google && window.LifeConfig.google.clientId && !window.LifeConfig.google.clientId.includes('YOUR_GOOGLE')) {
-      try {
-        this.googleTokenClient = window.google.accounts.oauth2.initTokenClient({
-          client_id: window.LifeConfig.google.clientId,
-          scope: 'https://www.googleapis.com/auth/drive.appdata',
-          callback: (res) => {
-            if (res.access_token) {
-              window.LifeLog.info('LifeSync', 'Токен Google Drive API успешно получен/обновлен.');
-              this.setGoogleToken(res.access_token, res.expires_in);
-              if (window.LifeUI) window.LifeUI.showToast('🎉 Google Диск подключен!');
-              this.syncWithCurrentCloud();
-            }
-          }
-        });
-        window.LifeLog.info('LifeSync', 'Google Identity Services Client инициализирован.');
-      } catch (e) {
-        window.LifeLog.warn('LifeSync', 'Ошибка инициализации Google Identity Client', e);
-      }
-    }
+  // 2. ПРОФЕССИОНАЛЬНЫЙ GOOGLE OAUTH 2.0 (AUTHORIZATION CODE + ВЕЧНЫЙ REFRESH_TOKEN)
+  getCleanRedirectUri() {
+    let cleanPath = window.location.pathname.replace(/\/index\.html$/, '');
+    if (!cleanPath.endsWith('/')) cleanPath += '/';
+    return window.location.origin + cleanPath;
   },
 
-  async ensureFreshGoogleToken() {
-    if (this.googleToken && Date.now() < (this.googleTokenExpiresAt - 120000)) {
-      return true;
-    }
+  // Проверка возврата из Google OAuth (перехват параметра ?code=...)
+  async checkUrlCode() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
 
-    window.LifeLog.info('LifeSync', 'Токен Google Drive истекает. Запуск тихого фонового обновления токена...');
-    if (!this.googleTokenClient) this.initGoogleClient();
-    if (!this.googleTokenClient) throw new Error('AUTH_ERROR: Google Client не настроен');
+    if (code) {
+      window.LifeLog.info('LifeSync', 'Обнаружен разовый код авторизации Google. Обмениваем на вечный ключ...');
+      // Очищаем URL от технического кода
+      history.replaceState(null, document.title, window.location.pathname + window.location.hash);
 
-    return new Promise((resolve) => {
-      const prevCallback = this.googleTokenClient.callback;
-      this.googleTokenClient.callback = (res) => {
-        if (res.access_token) {
-          this.setGoogleToken(res.access_token, res.expires_in);
-          window.LifeLog.info('LifeSync', 'Тихое продление сессии Google прошло успешно.');
-          resolve(true);
-        } else {
-          window.LifeLog.warn('LifeSync', 'Фоновое продление Google отклонено.');
-          resolve(false);
+      try {
+        if (window.LifeUI) window.LifeUI.showToast('Подключаем Google Диск...');
+        const proxyUrl = window.LifeConfig.network.proxyUrl;
+        const res = await fetch(`${proxyUrl}/auth/google/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: code,
+            redirect_uri: this.getCleanRedirectUri(),
+            client_id: window.LifeConfig.google.clientId
+          })
+        });
+
+        const tokenData = await res.json();
+        if (!res.ok || tokenData.error) {
+          throw new Error(tokenData.error_description || tokenData.error || 'Сбой обмена токена');
         }
-        this.googleTokenClient.callback = prevCallback;
-      };
-      this.googleTokenClient.requestAccessToken({ prompt: '' });
-    });
+
+        this.setGoogleSession(tokenData);
+        window.LifeLog.info('LifeSync', '🎉 Google Диск успешно авторизован! Вечный refresh_token сохранен.');
+        if (window.LifeUI) {
+          window.LifeUI.showToast('🎉 Google Диск успешно подключен навсегда!');
+          window.LifeUI.updateCloudStatusUI();
+        }
+
+        // Немедленная первая синхронизация
+        this.syncWithCurrentCloud();
+        return true;
+      } catch (err) {
+        window.LifeLog.error('LifeSync', 'Ошибка обмена токена Google', err);
+        if (window.LifeUI) window.LifeUI.customAlert(`Не удалось подключить Google Диск: ${err.message}`, 'Ошибка авторизации');
+      }
+    }
+    return false;
   },
 
   startGoogleLogin() {
-    if (!window.LifeConfig.google || !window.LifeConfig.google.clientId || window.LifeConfig.google.clientId.includes('YOUR_GOOGLE')) {
-      window.LifeUI.customAlert(
-        `Чтобы включить Google Диск, укажите ваш <strong>Client ID</strong> в файле <code>assets/js/config.js</code>.`,
-        'Настройка Google Диска'
-      );
+    const clientId = window.LifeConfig.google.clientId;
+    if (!clientId || clientId.includes('YOUR_GOOGLE')) {
+      window.LifeUI.customAlert('Укажите Google Client ID в файле config.js', 'Настройка');
       return;
     }
-    if (!this.googleTokenClient) this.initGoogleClient();
-    if (this.googleTokenClient) {
-      window.LifeLog.info('LifeSync', 'Запрос авторизации Google через всплывающее окно...');
-      this.googleTokenClient.requestAccessToken();
-    }
+
+    const redirectUri = this.getCleanRedirectUri();
+    const scope = encodeURIComponent('https://www.googleapis.com/auth/drive.appdata');
+    
+    // access_type=offline и prompt=consent гарантируют выдачу вечного refresh_token!
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+
+    window.LifeLog.info('LifeSync', 'Редирект на страницу авторизации Google...');
+    window.location.href = authUrl;
   },
 
-  setGoogleToken(token, expiresIn = 3600) {
-    this.googleToken = String(token || '').trim();
-    this.googleTokenExpiresAt = Date.now() + (Number(expiresIn) * 1000);
+  setGoogleSession(data) {
+    this.googleToken = data.access_token;
+    this.googleTokenExpiresAt = Date.now() + ((Number(data.expires_in) || 3600) * 1000);
     localStorage.setItem('LIFE_OS_GOOGLE_TOKEN', this.googleToken);
     localStorage.setItem('LIFE_OS_GOOGLE_EXPIRES', this.googleTokenExpiresAt.toString());
+
+    if (data.refresh_token) {
+      this.googleRefreshToken = data.refresh_token;
+      localStorage.setItem('LIFE_OS_GOOGLE_REFRESH', this.googleRefreshToken);
+    }
     this.setStatus('SYNCING');
   },
 
+  // 100% НЕВИДИМОЕ ФОНОВОЕ ПРОДЛЕНИЕ СЕССИИ (БЕЗ ОКОН И КЛИКОВ)
+  async ensureFreshGoogleToken() {
+    if (this.googleToken && Date.now() < (this.googleTokenExpiresAt - 120000)) {
+      return true; // Токен еще свежий
+    }
+
+    const refreshToken = this.googleRefreshToken || localStorage.getItem('LIFE_OS_GOOGLE_REFRESH');
+    if (!refreshToken) {
+      throw new Error('AUTH_ERROR: Отсутствует ключ продления (refresh_token)');
+    }
+
+    window.LifeLog.info('LifeSync', '⏳ Рабочий ключ Google истек. Выполняем невидимое продление через Cloudflare шлюз...');
+    const proxyUrl = window.LifeConfig.network.proxyUrl;
+
+    const res = await this.fetchWithTimeout(`${proxyUrl}/auth/google/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        refresh_token: refreshToken,
+        client_id: window.LifeConfig.google.clientId
+      })
+    }, 7000);
+
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      throw new Error(`AUTH_ERROR: ${data.error_description || data.error || 'Не удалось обновить ключ'}`);
+    }
+
+    this.googleToken = data.access_token;
+    this.googleTokenExpiresAt = Date.now() + ((Number(data.expires_in) || 3600) * 1000);
+    localStorage.setItem('LIFE_OS_GOOGLE_TOKEN', this.googleToken);
+    localStorage.setItem('LIFE_OS_GOOGLE_EXPIRES', this.googleTokenExpiresAt.toString());
+    window.LifeLog.info('LifeSync', '✅ Рабочий ключ Google успешно продлен на следующий час в фоновом режиме.');
+    return true;
+  },
+
   unlinkGoogle() {
-    window.LifeLog.warn('LifeSync', 'Отключение аккаунта Google Диска.');
+    window.LifeLog.warn('LifeSync', 'Отключение Google Диска.');
     this.googleToken = null;
+    this.googleRefreshToken = null;
     this.googleTokenExpiresAt = 0;
     this.googleFileId = null;
     localStorage.removeItem('LIFE_OS_GOOGLE_TOKEN');
+    localStorage.removeItem('LIFE_OS_GOOGLE_REFRESH');
     localStorage.removeItem('LIFE_OS_GOOGLE_EXPIRES');
     localStorage.removeItem('LIFE_OS_GOOGLE_FILE_ID');
     localStorage.removeItem('LIFE_OS_LAST_SYNC_TS_GOOGLE');

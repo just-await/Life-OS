@@ -26,7 +26,6 @@ window.LifeSync = {
 
     window.LifeLog.info('LifeSync', `Конфигурация загружена. Провайдер: [${this.provider.toUpperCase()}]. Ключ авторизации: ${currentToken ? 'Присутствует' : 'Отсутствует'}`);
 
-    this.initGoogleClient();
     this.setupLifecycleListeners();
   },
 
